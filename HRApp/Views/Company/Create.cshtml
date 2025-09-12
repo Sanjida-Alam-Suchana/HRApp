@@ -1,0 +1,184 @@
+﻿@model HRApp.Models.Company
+
+@{
+    ViewData["Title"] = "Add Company";
+}
+
+<div class="container">
+    <h2>Add Company</h2>
+    <div>
+        <label>Select Company:</label>
+        <select id="companyFilter" class="form-select d-inline w-auto" onchange="filterByCompany()">
+            <option value="">All Companies</option>
+            @foreach (var company in ViewBag.Companies ?? new List<dynamic>())
+            {
+                <option value="@company.Id" selected="@(ViewBag.SelectedCompanyId == company.Id)">@company.ComName</option>
+            }
+        </select>
+    </div>
+    <form id="companyForm" novalidate>
+        <div class="mb-3">
+            <label asp-for="ComName" class="form-label">Company Name</label>
+            <input asp-for="ComName" class="form-control" required />
+            <span asp-validation-for="ComName" class="text-danger"></span>
+        </div>
+        <div class="mb-3">
+            <label asp-for="Basic" class="form-label">Basic (%)</label>
+            <input asp-for="Basic" class="form-control" type="number" step="0.01" min="0" max="1" required />
+            <span asp-validation-for="Basic" class="text-danger"></span>
+        </div>
+        <div class="mb-3">
+            <label asp-for="HRent" class="form-label">House Rent (%)</label>
+            <input asp-for="HRent" class="form-control" type="number" step="0.01" min="0" max="1" required />
+            <span asp-validation-for="HRent" class="text-danger"></span>
+        </div>
+        <div class="mb-3">
+            <label asp-for="Medical" class="form-label">Medical (%)</label>
+            <input asp-for="Medical" class="form-control" type="number" step="0.01" min="0" max="1" required />
+            <span asp-validation-for="Medical" class="text-danger"></span>
+        </div>
+        <div class="mb-3 form-check">
+            <input asp-for="IsInactive" type="checkbox" class="form-check-input" />
+            <label asp-for="IsInactive" class="form-check-label">Is Inactive</label>
+        </div>
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.3/jquery.validate.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate-unobtrusive/3.2.12/jquery.validate.unobtrusive.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            $("#companyForm").on("submit", function (e) {
+                e.preventDefault();
+                if ($(this).valid()) {
+                    $.ajax({
+                        url: '@Url.Action("Create", "Company")',
+                        type: "POST",
+                        data: $(this).serialize(),
+                        success: function (response) {
+                            if (response.success) {
+                                alert(response.message);
+                                $("#companyForm")[0].reset();  // Clear form
+                                loadCompanies();  // Reload table
+                            } else {
+                                alert("Error: " + (response.errors ? response.errors.join(', ') : "Unknown error"));
+                            }
+                        },
+                        error: function (xhr, status, error) {
+                            alert("Submit failed: " + error + "\nStatus: " + xhr.status);
+                        }
+                    });
+                }
+            });
+
+            function filterByCompany() {
+                var selectedId = $("#companyFilter").val();
+                if (selectedId) {
+                    $.ajax({
+                        url: '@Url.Action("SetSelectedCompany", "Home")',
+                        type: "POST",
+                        data: { companyId: selectedId },
+                        success: function () {
+                            loadCompanies();  // Reload table with filter
+                        }
+                    });
+                } else {
+                    loadCompanies();  // Load all if no filter
+                }
+            }
+        });
+
+        function loadCompanies() {
+            $.ajax({
+                url: '@Url.Action("GetCompanies", "Company")',
+                type: "GET",
+                success: function (data) {
+                    var tbody = $("#companiesTable tbody");
+                    tbody.empty();
+                    var selectedId = $("#companyFilter").val() || "@ViewBag.SelectedCompanyId";
+                    var filteredData = selectedId ? data.filter(c => c.id == selectedId) : data;
+                    $.each(filteredData, function (index, company) {
+                        var inactive = company.isInactive ? "Yes" : "No";
+                        tbody.append(`
+                            <tr>
+                                <td>${company.id}</td>
+                                <td>${company.name}</td>
+                                <td>${company.basic}</td>
+                                <td>${company.hrent}</td>
+                                <td>${company.medical}</td>
+                                <td>${inactive}</td>
+                                <td>
+                                    <a href="@Url.Action("Edit", "Company", new { id = "PLACEHOLDER" })" class="btn btn-sm btn-warning edit-btn" data-id="${company.id}">Edit</a>
+                                    <button class="btn btn-sm btn-danger delete-btn" data-id="${company.id}">Delete</button>
+                                </td>
+                            </tr>
+                        `);
+                    });
+                },
+                error: function () {
+                    alert("Error loading companies");
+                }
+            });
+        }
+    </script>
+}
+@* @model HRApp.Models.Company
+
+@{
+    ViewData["Title"] = "Add Company";
+}
+
+<form id="companyForm" novalidate>
+    <div class="mb-3">
+        <label class="form-label">Company Name</label>
+        <input asp-for="ComName" class="form-control" required />
+        <span asp-validation-for="ComName" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Basic (%)</label>
+        <input asp-for="Basic" class="form-control" required type="number" step="0.01" min="0" max="1" />
+        <span asp-validation-for="Basic" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">House Rent (%)</label>
+        <input asp-for="HRent" class="form-control" required type="number" step="0.01" min="0" max="1" />
+        <span asp-validation-for="HRent" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Medical (%)</label>
+        <input asp-for="Medical" class="form-control" required type="number" step="0.01" min="0" max="1" />
+        <span asp-validation-for="Medical" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Is Inactive</label>
+        <input asp-for="IsInactive" type="checkbox" class="form-check-input" />
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $("#companyForm").on("submit", function (e) {
+                e.preventDefault();
+                if ($(this).valid()) {
+                    $.ajax({
+                        url: '@Url.Action("Create", "Company")',
+                        type: "POST",
+                        data: $(this).serialize(),
+                        success: function (response) {
+                            if (response.success) {
+                                window.location.href = '@Url.Action("Index", "Company")';
+                            } else {
+                                alert("Error occurred");
+                            }
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+} *@

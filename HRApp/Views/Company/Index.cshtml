@@ -1,0 +1,187 @@
+﻿@model IEnumerable<HRApp.Models.Company>
+
+@{
+    ViewData["Title"] = "Companies";
+}
+
+<div class="container">
+    <h2>Companies</h2>
+    <a asp-action="Create" class="btn btn-primary mb-3">+ Add Company</a>
+    <div>
+        <label>Select Company:</label>
+        <select id="companyFilter" class="form-select d-inline w-auto" onchange="filterByCompany()">
+            <option value="">All Companies</option>
+            @foreach (var company in ViewBag.Companies ?? new List<dynamic>())
+            {
+                <option value="@company.Id" selected="@(ViewBag.SelectedCompanyId == company.Id)">@company.ComName</option>
+            }
+        </select>
+    </div>
+    <table class="table table-striped" id="companiesTable">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>ComName</th>
+                <th>Basic (%)</th>
+                <th>HRent (%)</th>
+                <th>Medical (%)</th>
+                <th>IsInactive</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            loadCompanies();
+
+            function loadCompanies() {
+                $.ajax({
+                    url: '@Url.Action("GetCompanies", "Company")',
+                    type: "GET",
+                    success: function (data) {
+                        var tbody = $("#companiesTable tbody");
+                        tbody.empty();
+                        var selectedId = $("#companyFilter").val() || "@ViewBag.SelectedCompanyId";
+                        var filteredData = selectedId ? data.filter(c => c.id == selectedId) : data;
+                        $.each(filteredData, function (index, company) {
+                            var inactive = company.isInactive ? "Yes" : "No";
+                            tbody.append(`
+                                <tr>
+                                    <td>${company.id}</td>
+                                    <td>${company.name}</td>
+                                    <td>${company.basic}</td>
+                                    <td>${company.hrent}</td>
+                                    <td>${company.medical}</td>
+                                    <td>${inactive}</td>
+                                    <td>
+                                        <a href="@Url.Action("Edit", "Company", new { id = "PLACEHOLDER" })" class="btn btn-sm btn-warning edit-btn" data-id="${company.id}">Edit</a>
+                                        <button class="btn btn-sm btn-danger delete-btn" data-id="${company.id}">Delete</button>
+                                    </td>
+                                </tr>
+                            `);
+                        });
+                    },
+                    error: function () {
+                        alert("Error loading companies");
+                    }
+                });
+            }
+
+            function filterByCompany() {
+                var selectedId = $("#companyFilter").val();
+                if (selectedId) {
+                    $.ajax({
+                        url: '@Url.Action("SetSelectedCompany", "Home")',
+                        type: "POST",
+                        data: { companyId: selectedId },
+                        success: function () {
+                            loadCompanies();  // Reload table with filter
+                        }
+                    });
+                } else {
+                    loadCompanies();  // Load all if no filter
+                }
+            }
+
+            $(document).on("click", ".delete-btn", function () {
+                if (confirm("Are you sure?")) {
+                    var id = $(this).data("id");
+                    $.ajax({
+                        url: '@Url.Action("Delete", "Company")',
+                        type: "POST",
+                        data: { id: id },
+                        success: function (response) {
+                            if (response.success) {
+                                loadCompanies();  // Reload table
+                            } else {
+                                alert("Delete failed");
+                            }
+                        },
+                        error: function () {
+                            alert("Delete error");
+                        }
+                    });
+                }
+            });
+
+            $(document).on("click", ".edit-btn", function () {
+                var id = $(this).data("id");
+                window.location.href = '@Url.Action("Edit", "Company")/' + id;
+            });
+        });
+    </script>
+}
+@* @model IEnumerable<HRApp.Models.Company>
+
+@{
+    ViewData["Title"] = "Companies";
+}
+
+<div class="container">
+    <h2>Companies</h2>
+    <a asp-action="Create" class="btn btn-primary mb-3">+ Add Company</a>
+    <table class="table" id="companiesTable">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>ComName</th>
+                <th>Basic (%)</th>
+                <th>House Rent (%)</th>
+                <th>Medical (%)</th>
+                <th>IsInactive</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            loadCompanies();
+
+            function loadCompanies() {
+                $.ajax({
+                    url: '@Url.Action("GetCompanies", "Company")',
+                    type: "POST",
+                    success: function (data) {
+                        var tbody = $("#companiesTable tbody");
+                        tbody.empty();
+                        $.each(data, function (index, company) {
+                            tbody.append(`
+                                <tr>
+                                    <td>${company.id}</td>
+                                    <td>${company.name}</td>
+                                    <td>${company.basic || 0.5}</td>
+                                    <td>${company.hrent || 0.3}</td>
+                                    <td>${company.medical || 0.15}</td>
+                                    <td>${company.isInactive || false}</td>
+                                    <td><a href="@Url.Action("Edit", "Company")/${company.id}" class="btn btn-sm btn-warning">Edit</a> <button class="btn btn-sm btn-danger delete-btn" data-id="${company.id}">Delete</button></td>
+                                </tr>
+                            `);
+                        });
+                    }
+                });
+            }
+
+            $(document).on("click", ".delete-btn", function () {
+                if (confirm("Are you sure?")) {
+                    var id = $(this).data("id");
+                    $.ajax({
+                        url: '@Url.Action("Delete", "Company")',
+                        type: "POST",
+                        data: { id: id },
+                        success: function () {
+                            loadCompanies();
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+} *@

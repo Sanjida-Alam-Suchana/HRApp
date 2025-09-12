@@ -1,0 +1,68 @@
+﻿@model IEnumerable<HRApp.Models.Shift>
+
+@{
+    ViewData["Title"] = "Shifts";
+}
+
+<div class="container">
+    <h2>Shifts</h2>
+    <a asp-action="Create" class="btn btn-primary mb-3">+ Add Shift</a>
+    <table class="table" id="shiftsTable">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>ShiftName</th>
+                <th>In</th>
+                <th>Out</th>
+                <th>Late</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            loadShifts();
+
+            function loadShifts() {
+                $.ajax({
+                    url: '@Url.Action("GetShifts", "Shift")',
+                    type: "POST",
+                    success: function (data) {
+                        var tbody = $("#shiftsTable tbody");
+                        tbody.empty();
+                        $.each(data, function (index, shift) {
+                            tbody.append(`
+                                <tr>
+                                    <td>${shift.id}</td>
+                                    <td>${shift.name}</td>
+                                    <td>${shift.in || "N/A"}</td>
+                                    <td>${shift.out || "N/A"}</td>
+                                    <td>${shift.late || "N/A"}</td>
+                                    <td><a href="@Url.Action("Edit", "Shift")/${shift.id}" class="btn btn-sm btn-warning">Edit</a> <button class="btn btn-sm btn-danger delete-btn" data-id="${shift.id}">Delete</button></td>
+                                </tr>
+                            `);
+                        });
+                    }
+                });
+            }
+
+            $(document).on("click", ".delete-btn", function () {
+                if (confirm("Are you sure?")) {
+                    var id = $(this).data("id");
+                    $.ajax({
+                        url: '@Url.Action("Delete", "Shift")',
+                        type: "POST",
+                        data: { id: id },
+                        success: function () {
+                            loadShifts();
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+}

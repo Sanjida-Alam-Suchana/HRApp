@@ -1,0 +1,41 @@
+﻿@{
+    ViewData["Title"] = "Home";
+}
+
+<div class="container text-center">
+    <h1 class="display-4">HR Management System</h1>
+    <p>Select Company to Filter Data:</p>
+    <select id="companySelect" class="form-select d-inline w-auto" style="width: auto;">
+        <option value="">-- Select Company --</option>
+        @foreach (var company in ViewBag.Companies ?? new List<dynamic>())
+        {
+            <option value="@company.Id" selected="@(ViewBag.SelectedCompanyId == company.Id)">@company.ComName</option>
+        }
+    </select>
+    <button id="selectCompanyBtn" class="btn btn-primary ms-2">Select</button>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $("#selectCompanyBtn").on("click", function () {
+                var selectedId = $("#companySelect").val();
+                if (selectedId) {
+                    $.ajax({
+                        url: '@Url.Action("SetSelectedCompany", "Home")',
+                        type: "POST",
+                        data: { companyId: selectedId },
+                        success: function (response) {
+                            if (response.success) {
+                                alert("Company selected! Data will be filtered.");
+                                window.location.href = '@Url.Action("Index", "Company")';  // Redirect to Company page
+                            }
+                        }
+                    });
+                } else {
+                    alert("Please select a company.");
+                }
+            });
+        });
+    </script>
+}

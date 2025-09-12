@@ -1,0 +1,62 @@
+﻿@model IEnumerable<HRApp.Models.Department>
+
+@{
+    ViewData["Title"] = "Departments";
+}
+
+<div class="container">
+    <h2>Departments</h2>
+    <a asp-action="Create" class="btn btn-primary mb-3">+ Add Department</a>
+    <table class="table" id="departmentsTable">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>DeptName</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            loadDepartments();
+
+            function loadDepartments() {
+                $.ajax({
+                    url: '@Url.Action("GetDepartments", "Department")',
+                    type: "POST",
+                    success: function (data) {
+                        var tbody = $("#departmentsTable tbody");
+                        tbody.empty();
+                        $.each(data, function (index, department) {
+                            tbody.append(`
+                                <tr>
+                                    <td>${department.id}</td>
+                                    <td>${department.name}</td>
+                                    <td><a href="@Url.Action("Edit", "Department")/${department.id}" class="btn btn-sm btn-warning">Edit</a> <button class="btn btn-sm btn-danger delete-btn" data-id="${department.id}">Delete</button></td>
+                                </tr>
+                            `);
+                        });
+                    }
+                });
+            }
+
+            $(document).on("click", ".delete-btn", function () {
+                if (confirm("Are you sure?")) {
+                    var id = $(this).data("id");
+                    $.ajax({
+                        url: '@Url.Action("Delete", "Department")',
+                        type: "POST",
+                        data: { id: id },
+                        success: function () {
+                            loadDepartments();
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+}
