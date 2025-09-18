@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HRApp.Models
 {
@@ -11,15 +12,24 @@ namespace HRApp.Models
 
         public Guid EmpId { get; set; }
 
+        [Required]
+        [DataType(DataType.Date)]
         public DateOnly dtDate { get; set; }
 
-        public required string AttStatus { get; set; } // P/A/L, auto-calculated
+        [Required]
+        public string AttStatus { get; set; } // P/A/L, auto-calculated
 
+        [Required]
         public TimeOnly InTime { get; set; }
 
+        [Required]
         public TimeOnly OutTime { get; set; }
 
+        [ForeignKey("ComId")]
         public virtual required Company Company { get; set; }
+
+        [ForeignKey("EmpId")]
         public virtual required Employee Employee { get; set; }
     }
 }
+

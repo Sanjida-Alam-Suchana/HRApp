@@ -1,0 +1,360 @@
+﻿@model IEnumerable<HRApp.Models.Attendance>
+@using HRApp.Models
+@{
+    ViewData["Title"] = "Attendance List";
+    var companies = ViewBag.Companies as List<Company>;
+    var employees = ViewBag.Employees as List<Employee>;
+}
+
+<div class="container mt-4">
+    <h2>Attendance List</h2>
+
+    <!-- Create Form -->
+    <div class="card mb-4 p-3">
+        <h4>Create New Attendance</h4>
+        <form id="createAttendanceForm">
+            @Html.AntiForgeryToken()
+            <div class="form-group mb-3">
+                <label for="ComId">Company</label>
+                <select id="ComId" name="ComId" class="form-control" required>
+                    <option value="">Select Company</option>
+                    @foreach (var company in companies)
+                    {
+                        <option value="@company.ComId">@company.ComName</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group mb-3">
+                <label for="EmpId">Employee</label>
+                <select id="EmpId" name="EmpId" class="form-control" required>
+                    <option value="">Select Employee</option>
+                    @foreach (var employee in employees)
+                    {
+                        <option value="@employee.EmpId" data-comid="@employee.ComId.ToString()" data-shift-starttime="@(employee.Shift?.StartTime.ToString("HH:mm") ?? "")">@employee.EmpName</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group mb-3">
+                <label for="dtDate">Date</label>
+                <input type="date" id="dtDate" name="dtDate" class="form-control" required />
+            </div>
+            <div class="form-group mb-3">
+                <label for="InTime">In Time</label>
+                <input type="time" id="InTime" name="InTime" class="form-control" required />
+            </div>
+            <div class="form-group mb-3">
+                <label for="OutTime">Out Time</label>
+                <input type="time" id="OutTime" name="OutTime" class="form-control" required />
+            </div>
+            <div class="form-group mb-3">
+                <label for="AttStatus">Status</label>
+                <select id="AttStatus" name="AttStatus" class="form-control" required>
+                    <option value="P">Present</option>
+                    <option value="L">Late</option>
+                    <option value="A">Absent</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Create</button>
+        </form>
+    </div>
+
+    <!-- Company Dropdown -->
+    <select id="companyDropdown" class="form-select mb-3" onchange="setCompany(this.value)">
+        <option value="">Select Company</option>
+        @foreach (var company in companies)
+        {
+            <option value="@company.ComId.ToString()">@company.ComName</option>
+        }
+    </select>
+
+    <!-- Hidden AntiForgery token -->
+    <form id="antiForgeryForm">
+        @Html.AntiForgeryToken()
+    </form>
+
+    <!-- Edit Modal -->
+    <div class="modal fade" id="editAttendanceModal" tabindex="-1" aria-labelledby="editAttendanceModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editAttendanceModalLabel">Edit Attendance</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editAttendanceForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" id="editId" name="Id" />
+                        <div class="form-group mb-3">
+                            <label for="editComId">Company</label>
+                            <select id="editComId" name="ComId" class="form-control" required>
+                                <option value="">Select Company</option>
+                                @foreach (var company in companies)
+                                {
+                                    <option value="@company.ComId">@company.ComName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="editEmpId">Employee</label>
+                            <select id="editEmpId" name="EmpId" class="form-control" required>
+                                <option value="">Select Employee</option>
+                                @foreach (var employee in employees)
+                                {
+                                    <option value="@employee.EmpId" data-comid="@employee.ComId.ToString()" data-shift-starttime="@(employee.Shift?.StartTime.ToString("HH:mm") ?? "")">@employee.EmpName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="editDtDate">Date</label>
+                            <input type="date" id="editDtDate" name="dtDate" class="form-control" required />
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="editInTime">In Time</label>
+                            <input type="time" id="editInTime" name="InTime" class="form-control" required />
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="editOutTime">Out Time</label>
+                            <input type="time" id="editOutTime" name="OutTime" class="form-control" required />
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="editAttStatus">Status</label>
+                            <select id="editAttStatus" name="AttStatus" class="form-control" required>
+                                <option value="P">Present</option>
+                                <option value="L">Late</option>
+                                <option value="A">Absent</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Employee</th>
+                <th>Status</th>
+                <th>In Time</th>
+                <th>Out Time</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="attendanceTable">
+            @foreach (var item in Model)
+            {
+                var employeeName = item.Employee?.EmpName ?? "N/A";
+                <tr id="row-@item.Id" data-comid="@item.ComId.ToString()" data-empid="@item.EmpId" data-dtdate="@item.dtDate.ToString("yyyy-MM-dd")" data-intime="@item.InTime.ToString("HH:mm")" data-outtime="@item.OutTime.ToString("HH:mm")" data-attstatus="@item.AttStatus">
+                    <td>@item.dtDate.ToString("yyyy-MM-dd")</td>
+                    <td>@employeeName</td>
+                    <td>@item.AttStatus</td>
+                    <td>@item.InTime.ToString("HH:mm")</td>
+                    <td>@item.OutTime.ToString("HH:mm")</td>
+                    <td>
+                        <button class="btn btn-warning btn-sm" onclick="openEditModal('@item.Id')">Edit</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteAttendance('@item.Id')">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            // Update AttStatus based on InTime and Shift StartTime
+            function updateAttStatus(inTimeField, attStatusField, empIdField) {
+                var inTime = $(inTimeField).val();
+                var empId = $(empIdField).val();
+                var shiftStartTime = $(empIdField + " option:selected").data("shift-starttime");
+                
+                if (inTime && shiftStartTime) {
+                    var inTimeDate = new Date("1970-01-01T" + inTime + ":00");
+                    var startTimeDate = new Date("1970-01-01T" + shiftStartTime + ":00");
+                    if (inTimeDate > startTimeDate) {
+                        $(attStatusField).val("L"); // Late
+                    } else {
+                        $(attStatusField).val("P"); // Present
+                    }
+                } else {
+                    $(attStatusField).val("P"); // Default to Present if no shift
+                }
+            }
+
+            // Filter employees based on selected company (Create Form)
+            $("#ComId").change(function () {
+                var comId = $(this).val();
+                $("#EmpId option").each(function () {
+                    var empComId = $(this).data("comid");
+                    $(this).toggle(comId === "" || empComId === comId);
+                });
+                $("#EmpId").val(""); // Reset employee selection
+                updateAttStatus("#InTime", "#AttStatus", "#EmpId");
+            });
+
+            // Filter employees based on selected company (Edit Form)
+            $("#editComId").change(function () {
+                var comId = $(this).val();
+                $("#editEmpId option").each(function () {
+                    var empComId = $(this).data("comid");
+                    $(this).toggle(comId === "" || empComId === comId);
+                });
+                $("#editEmpId").val(""); // Reset employee selection
+                updateAttStatus("#editInTime", "#editAttStatus", "#editEmpId");
+            });
+
+            // Update AttStatus on EmpId or InTime change (Create Form)
+            $("#EmpId, #InTime").change(function () {
+                updateAttStatus("#InTime", "#AttStatus", "#EmpId");
+            });
+
+            // Update AttStatus on EmpId or InTime change (Edit Form)
+            $("#editEmpId, #editInTime").change(function () {
+                updateAttStatus("#editInTime", "#editAttStatus", "#editEmpId");
+            });
+
+            // Create Attendance
+            $("#createAttendanceForm").submit(function (e) {
+                e.preventDefault();
+                $.ajax({
+                    url: '/Attendances/AttendanceCreate',
+                    type: 'POST',
+                    data: $(this).serialize(),
+                    headers: {
+                        "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val()
+                    },
+                    success: function (response) {
+                        alert(response.message);
+                        if (response.success) {
+                            var comId = $("#ComId").val();
+                            document.cookie = "SelectedComId=" + comId + "; path=/";
+                            var employeeName = $("#EmpId option:selected").text();
+                            var newRow = `
+                                <tr id="row-${response.id}" data-comid="${comId}" data-empid="${$("#EmpId").val()}" data-dtdate="${$("#dtDate").val()}" data-intime="${$("#InTime").val()}" data-outtime="${$("#OutTime").val()}" data-attstatus="${response.attStatus}">
+                                    <td>${$("#dtDate").val()}</td>
+                                    <td>${employeeName}</td>
+                                    <td>${response.attStatus}</td>
+                                    <td>${$("#InTime").val()}</td>
+                                    <td>${$("#OutTime").val()}</td>
+                                    <td>
+                                        <button class="btn btn-warning btn-sm" onclick="openEditModal('${response.id}')">Edit</button>
+                                        <button class="btn btn-danger btn-sm" onclick="deleteAttendance('${response.id}')">Delete</button>
+                                    </td>
+                                </tr>`;
+                            $("#attendanceTable").append(newRow);
+                            $("#createAttendanceForm")[0].reset();
+                            $("#companyDropdown").val(comId);
+                            setCompany(comId); // Apply filter
+                        }
+                    },
+                    error: function (xhr) {
+                        alert("Failed: " + (xhr.responseJSON?.message || "Unknown error"));
+                    }
+                });
+            });
+
+            // Open Edit Modal
+            window.openEditModal = function (id) {
+                var row = $("#row-" + id);
+                $("#editId").val(id);
+                $("#editComId").val(row.data("comid"));
+                $("#editComId").trigger("change"); // Trigger company filter
+                $("#editEmpId").val(row.data("empid"));
+                $("#editDtDate").val(row.data("dtdate"));
+                $("#editInTime").val(row.data("intime"));
+                $("#editOutTime").val(row.data("outtime"));
+                $("#editAttStatus").val(row.data("attstatus"));
+                updateAttStatus("#editInTime", "#editAttStatus", "#editEmpId"); // Update status
+                $("#editAttendanceModal").modal("show");
+            };
+
+            // Edit Attendance
+            $("#editAttendanceForm").submit(function (e) {
+                e.preventDefault();
+                var id = $("#editId").val();
+                $.ajax({
+                    url: '/Attendances/AttendanceEdit/' + id,
+                    type: 'POST',
+                    data: $(this).serialize(),
+                    headers: {
+                        "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val()
+                    },
+                    success: function (response) {
+                        alert(response.message);
+                        if (response.success) {
+                            var comId = $("#editComId").val();
+                            document.cookie = "SelectedComId=" + comId + "; path=/";
+                            var row = $("#row-" + id);
+                            var employeeName = $("#editEmpId option:selected").text();
+                            row.data("comid", comId);
+                            row.data("empid", $("#editEmpId").val());
+                            row.data("dtdate", $("#editDtDate").val());
+                            row.data("intime", $("#editInTime").val());
+                            row.data("outtime", $("#editOutTime").val());
+                            row.data("attstatus", response.attStatus);
+                            row.find("td:eq(0)").text($("#editDtDate").val());
+                            row.find("td:eq(1)").text(employeeName);
+                            row.find("td:eq(2)").text(response.attStatus);
+                            row.find("td:eq(3)").text($("#editInTime").val());
+                            row.find("td:eq(4)").text($("#editOutTime").val());
+                            $("#editAttendanceModal").modal("hide");
+                            $("#companyDropdown").val(comId);
+                            setCompany(comId); // Apply filter
+                        }
+                    },
+                    error: function (xhr) {
+                        alert("Failed: " + (xhr.responseJSON?.message || "Unknown error"));
+                    }
+                });
+            });
+
+            // Set company dropdown from cookie
+            var selectedComId = getCookie("SelectedComId");
+            if (selectedComId) {
+                $("#companyDropdown").val(selectedComId);
+                setCompany(selectedComId);
+            }
+
+            function getCookie(name) {
+                let match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+                return match ? match[2] : null;
+            }
+
+            // Filter table based on company
+            function setCompany(comId) {
+                $("#attendanceTable tr").each(function () {
+                    var rowComId = $(this).data("comid");
+                    $(this).toggle(comId === "" || rowComId === comId);
+                });
+            }
+
+            // Delete Attendance
+            window.deleteAttendance = function (id) {
+                if (confirm("Are you sure you want to delete this attendance?")) {
+                    $.ajax({
+                        url: '/Attendances/Delete/' + id,
+                        type: 'POST',
+                        headers: {
+                            "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val()
+                        },
+                        success: function (response) {
+                            alert(response.message);
+                            if (response.success) {
+                                $('#row-' + id).remove();
+                            }
+                        },
+                        error: function () {
+                            alert("Failed to delete attendance.");
+                        }
+                    });
+                }
+            };
+        });
+    </script>
+}

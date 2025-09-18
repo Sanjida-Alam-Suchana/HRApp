@@ -1,0 +1,316 @@
+﻿@model IEnumerable<HRApp.Models.AttendanceSummary>
+@using HRApp.Models
+@{
+    ViewData["Title"] = "Attendance Summary List";
+    var companies = ViewBag.Companies as List<Company>;
+}
+
+<div class="container mt-4">
+    <h2>Attendance Summary List</h2>
+    
+    <!-- Company Dropdown -->
+    <div class="form-group mb-3">
+        <label for="companyDropdown">Filter by Company</label>
+        <select id="companyDropdown" class="form-control" onchange="setCompany(this.value)">
+            <option value="">All Companies</option>
+            @foreach (var company in companies ?? new List<Company>())
+            {
+                <option value="@company.ComId">@company.ComName</option>
+            }
+        </select>
+    </div>
+
+    <button type="button" class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#generateModal">+ Generate Summary</button>
+
+    <!-- AntiForgery Token -->
+    @Html.AntiForgeryToken()
+
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Employee Name</th>
+                <th>Company</th>
+                <th>Summary Month</th>
+                <th>Total Days</th>
+                <th>Days Present</th>
+                <th>Days Absent</th>
+                <th>Days Late</th>
+                <th>Remarks</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="summaryTable">
+            @foreach (var item in Model)
+            {
+                var empName = item.Employee?.EmpName ?? "N/A";
+                var companyName = item.Company?.ComName ?? "N/A";
+                <tr id="row-@item.SummaryId" data-summaryid="@item.SummaryId" data-comid="@item.ComId">
+                    <td>@empName</td>
+                    <td>@companyName</td>
+                    <td>@item.SummaryMonth.ToString("yyyy-MM")</td>
+                    <td>@item.TotalDays</td>
+                    <td>@item.DaysPresent</td>
+                    <td>@item.DaysAbsent</td>
+                    <td>@item.DaysLate</td>
+                    <td>@item.Remarks</td>
+                    <td>
+                        <button class="btn btn-warning btn-sm edit-btn" data-bs-toggle="modal" data-bs-target="#editModal">Edit</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteSummary('@item.SummaryId')">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- Generate Summary Modal -->
+<div class="modal fade" id="generateModal" tabindex="-1" aria-labelledby="generateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="generateModalLabel">Generate Attendance Summary</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="generateForm">
+                    @Html.AntiForgeryToken()
+                    <div class="form-group mb-3">
+                        <label for="genComId">Company</label>
+                        <select id="genComId" name="ComId" class="form-control">
+                            <option value="">Select Company</option>
+                            @foreach (var company in companies ?? new List<Company>())
+                            {
+                                <option value="@company.ComId">@company.ComName</option>
+                            }
+                        </select>
+                        <div id="genComId-error" class="text-danger"></div>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="genSummaryMonth">Summary Month</label>
+                        <input type="month" class="form-control" id="genSummaryMonth" name="SummaryMonth" value="@DateTime.Now.ToString("yyyy-MM")" />
+                        <div id="genSummaryMonth-error" class="text-danger"></div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Generate</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editModalLabel">Edit Attendance Summary</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" id="editSummaryId" name="SummaryId" />
+                    <div class="form-group mb-3">
+                        <label for="editEmpId">Employee</label>
+                        <select id="editEmpId" name="EmpId" class="form-control">
+                            <option value="">Select Employee</option>
+                        </select>
+                        <div id="editEmpId-error" class="text-danger"></div>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="editComId">Company</label>
+                        <select id="editComId" name="ComId" class="form-control">
+                            <option value="">Select Company</option>
+                            @foreach (var company in companies ?? new List<Company>())
+                            {
+                                <option value="@company.ComId">@company.ComName</option>
+                            }
+                        </select>
+                        <div id="editComId-error" class="text-danger"></div>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="editSummaryMonth">Summary Month</label>
+                        <input type="month" class="form-control" id="editSummaryMonth" name="SummaryMonth" />
+                        <div id="editSummaryMonth-error" class="text-danger"></div>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="editTotalDays">Total Days</label>
+                        <input type="number" class="form-control" id="editTotalDays" name="TotalDays" min="1" />
+                        <div id="editTotalDays-error" class="text-danger"></div>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="editDaysPresent">Days Present</label>
+                        <input type="number" class="form-control" id="editDaysPresent" name="DaysPresent" min="0" />
+                        <div id="editDaysPresent-error" class="text-danger"></div>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="editDaysAbsent">Days Absent</label>
+                        <input type="number" class="form-control" id="editDaysAbsent" name="DaysAbsent" min="0" />
+                        <div id="editDaysAbsent-error" class="text-danger"></div>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="editDaysLate">Days Late</label>
+                        <input type="number" class="form-control" id="editDaysLate" name="DaysLate" min="0" />
+                        <div id="editDaysLate-error" class="text-danger"></div>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="editRemarks">Remarks</label>
+                        <textarea class="form-control" id="editRemarks" name="Remarks" rows="3"></textarea>
+                        <div id="editRemarks-error" class="text-danger"></div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.3/jquery.validate.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validation-unobtrusive/3.2.12/jquery.validate.unobtrusive.min.js"></script>
+
+    <script>
+        function setCompany(comId) {
+            document.cookie = "SelectedComId=" + comId + "; path=/";
+            location.reload();
+        }
+
+        function deleteSummary(id) {
+            if (confirm("Are you sure you want to delete this summary?")) {
+                $.ajax({
+                    url: '/AttendanceSummaries/Delete',
+                    type: 'POST',
+                    data: { id: id },
+                    headers: {
+                        "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    success: function (response) {
+                        alert(response.message);
+                        if (response.success) {
+                            $('#row-' + id).remove();
+                        }
+                    },
+                    error: function () {
+                        alert("Failed to delete summary.");
+                    }
+                });
+            }
+        }
+
+        $(document).ready(function () {
+            var selectedComId = getCookie("SelectedComId");
+            if (selectedComId) {
+                $("#companyDropdown").val(selectedComId);
+            }
+
+            // Generate Form Validation and Submit
+            $("#generateForm").validate({
+                rules: {
+                    ComId: { required: true },
+                    SummaryMonth: { required: true }
+                },
+                messages: {
+                    ComId: "Please select a company.",
+                    SummaryMonth: "Please select a summary month."
+                },
+                errorPlacement: function (error, element) {
+                    error.appendTo("#gen" + element.attr("name") + "-error");
+                }
+            });
+
+            $("#generateForm").submit(function (e) {
+                e.preventDefault();
+                if ($(this).valid()) {
+                    $.ajax({
+                        url: '/AttendanceSummaries/AttendanceSummaryGenerate',
+                        type: 'POST',
+                        data: $(this).serialize(),
+                        headers: {
+                            "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').val()
+                        },
+                        success: function (response) {
+                            alert(response.message);
+                            if (response.success) {
+                                $('#generateModal').modal('hide');
+                                location.reload(); // Refresh the list
+                            }
+                        },
+                        error: function (xhr) {
+                            alert("Failed to generate summary: " + (xhr.responseJSON?.message || "Unknown error"));
+                        }
+                    });
+                }
+            });
+
+            // Edit Form Validation and Submit
+            $("#editForm").validate({
+                rules: {
+                    EmpId: { required: true },
+                    ComId: { required: true },
+                    SummaryMonth: { required: true },
+                    TotalDays: { required: true, number: true, min: 1 },
+                    DaysPresent: { required: true, number: true, min: 0 },
+                    DaysAbsent: { required: true, number: true, min: 0 },
+                    DaysLate: { required: true, number: true, min: 0 }
+                },
+                messages: {
+                    EmpId: "Please select an employee.",
+                    ComId: "Please select a company.",
+                    SummaryMonth: "Please select a summary month.",
+                    TotalDays: "Please enter total days (minimum 1).",
+                    DaysPresent: "Please enter days present (minimum 0).",
+                    DaysAbsent: "Please enter days absent (minimum 0).",
+                    DaysLate: "Please enter days late (minimum 0)."
+                },
+                errorPlacement: function (error, element) {
+                    error.appendTo("#edit" + element.attr("name") + "-error");
+                }
+            });
+
+            $("#editForm").submit(function (e) {
+                e.preventDefault();
+                if ($(this).valid()) {
+                    var summaryId = $('#editSummaryId').val();
+                    $.ajax({
+                        url: '/AttendanceSummaries/AttendanceSummaryEdit/' + summaryId,
+                        type: 'POST',
+                        data: $(this).serialize(),
+                        headers: {
+                            "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').val()
+                        },
+                        success: function (response) {
+                            alert(response.message);
+                            if (response.success) {
+                                $('#editModal').modal('hide');
+                                location.reload(); // Refresh the list
+                            }
+                        },
+                        error: function (xhr) {
+                            alert("Failed to update summary: " + (xhr.responseJSON?.message || "Unknown error"));
+                        }
+                    });
+                }
+            });
+
+            // Edit Modal Population
+            $('.edit-btn').click(function () {
+                var row = $(this).closest('tr');
+                var summaryId = row.data('summaryid');
+                var comId = row.data('comid');
+
+                // Set basic fields
+                $('#editSummaryId').val(summaryId);
+                $('#editComId').val(comId);
+
+                // You'll need to populate other fields via AJAX or from data attributes
+                // For now, showing a placeholder
+                $('#editModal').modal('show');
+            });
+
+            function getCookie(name) {
+                let match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+                return match ? match[2] : null;
+            }
+        });
+    </script>
+}

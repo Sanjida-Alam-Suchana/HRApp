@@ -1,0 +1,171 @@
+﻿@model IEnumerable<HRApp.Models.Shift>
+@using HRApp.Models
+@{
+    ViewData["Title"] = "Shift List";
+    var companies = ViewBag.Companies as List<Company>;
+}
+
+
+<div class="container mt-4">
+    <h2>Shift List</h2>
+
+    <!-- Create Form -->
+    <div class="card mb-4 p-3">
+        <h4>Create New Shift</h4>
+        <form id="createForm">@Html.AntiForgeryToken()
+            <div class="form-group mb-2">
+                <label for="ComId">Company</label>
+                <select id="ComId" name="ComId" class="form-control">
+                    <option value="">Select Company</option>
+                    @foreach (var c in companies)
+                    {
+                        <option value="@c.ComId">@c.ComName</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group mb-2">
+                <label for="ShiftName">Shift Name</label>
+                <input type="text" id="ShiftName" name="ShiftName" class="form-control"/>
+            </div>
+            <div class="form-group mb-2">
+                <label for="StartTime">Start Time</label>
+                <input type="time" id="StartTime" name="StartTime" class="form-control"/>
+            </div>
+            <div class="form-group mb-2">
+                <label for="EndTime">End Time</label>
+                <input type="time" id="EndTime" name="EndTime" class="form-control"/>
+            </div>
+            <button type="submit" class="btn btn-primary">Create</button>
+        </form>
+    </div>
+
+    <!-- Shift Table -->
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Shift Name</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Company</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="shiftTable">
+            @foreach (var shift in Model)
+            {
+                var companyName = companies.FirstOrDefault(c => c.ComId == shift.ComId)?.ComName ?? "N/A";
+                <tr id="row-@shift.ShiftId">
+                    <td>@shift.ShiftName</td>
+                    <td>@shift.StartTime.ToString("HH:mm")</td>
+                    <td>@shift.EndTime.ToString("HH:mm")</td>
+                    <td>@companyName</td>
+                    <td>
+                        <button class="btn btn-warning btn-sm" onclick="editShift('@shift.ShiftId')">Edit</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteShift('@shift.ShiftId')">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- AntiForgery -->
+<form id="antiForgeryForm">@Html.AntiForgeryToken()</form>
+
+@section Scripts {
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function(){
+
+    // --- Create Shift ---
+    $("#createForm").submit(function(e){
+        e.preventDefault();
+        $.ajax({
+            url:'/Shifts/ShiftCreate',
+            type:'POST',
+            data: $(this).serialize(),
+            headers: { "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
+            success: function(res){
+                alert(res.message);
+                if(res.success){
+                    let s = res.shift;
+                    let newRow = `
+                        <tr id="row-${s.shiftId}">
+                            <td>${s.shiftName}</td>
+                            <td>${s.startTime}</td>
+                            <td>${s.endTime}</td>
+                            <td>${s.comName}</td>
+                            <td>
+                                <button class="btn btn-warning btn-sm" onclick="editShift('${s.shiftId}')">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteShift('${s.shiftId}')">Delete</button>
+                            </td>
+                        </tr>`;
+                    $("#shiftTable").append(newRow);
+                    $("#createForm")[0].reset();
+                }
+            },
+            error: function(xhr){
+                alert("Failed: " + (xhr.responseJSON?.message || "Unknown error"));
+            }
+        });
+    });
+
+});
+
+// --- Delete Shift ---
+function deleteShift(id){
+    if(confirm("Delete this shift?")){
+        $.ajax({
+            url:'/Shifts/Delete/'+id,
+            type:'POST',
+            headers:{ "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
+            success:function(res){
+                alert(res.message);
+                if(res.success) $("#row-"+id).remove();
+            }
+        });
+    }
+}
+
+// --- Edit Shift ---
+function editShift(id){
+    let row = $("#row-"+id);
+    let oldName = row.find("td:eq(0)").text();
+    let oldStart = row.find("td:eq(1)").text();
+    let oldEnd = row.find("td:eq(2)").text();
+    let oldCompany = row.find("td:eq(3)").text();
+
+    let newName = prompt("Edit Shift Name:", oldName);
+    if(newName === null) return;
+
+    let newStart = prompt("Edit Start Time (HH:mm):", oldStart);
+    if(newStart === null) return;
+
+    let newEnd = prompt("Edit End Time (HH:mm):", oldEnd);
+    if(newEnd === null) return;
+
+    let newCompanyName = prompt("Edit Company Name:", oldCompany);
+    if(newCompanyName === null) return;
+
+    // Find the ComId based on name
+    let comId = $("#ComId option").filter(function(){ return $(this).text() === newCompanyName; }).val();
+    if(!comId) { alert("Invalid company selected."); return; }
+
+    $.ajax({
+        url:'/Shifts/ShiftEdit/'+id,
+        type:'POST',
+        data: { ShiftId:id, ShiftName:newName, StartTime:newStart, EndTime:newEnd, ComId:comId },
+        headers:{ "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
+        success:function(res){
+            alert(res.message);
+            if(res.success){
+                row.find("td:eq(0)").text(newName);
+                row.find("td:eq(1)").text(newStart);
+                row.find("td:eq(2)").text(newEnd);
+                row.find("td:eq(3)").text(newCompanyName);
+            }
+        }
+    });
+}
+</script>
+}

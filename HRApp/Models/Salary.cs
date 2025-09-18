@@ -1,37 +1,66 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HRApp.Models
 {
     public class Salary
     {
         [Key]
-        public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid SalaryId { get; set; } = Guid.NewGuid();
 
-        public Guid ComId { get; set; }
+        [Required]
+        public Guid EmpId { get; set; } // FK to Employee
 
-        public Guid EmpId { get; set; }
+        [ForeignKey("EmpId")]
+        public virtual Employee? Employee { get; set; }
 
-        public int dtYear { get; set; }
+        [Required]
+        public Guid ComId { get; set; } // FK to Company
 
-        public int dtMonth { get; set; }
+        [ForeignKey("ComId")]
+        public virtual Company? Company { get; set; }
 
-        public decimal Gross { get; set; }
+        [Required]
+        [Range(2000, 2100)]
+        public int dtYear { get; set; } // Year of salary
 
-        public decimal Basic { get; set; }
+        [Required]
+        [Range(1, 12)]
+        public int dtMonth { get; set; } // Month of salary (1-12)
 
-        public decimal HRent { get; set; }
+        [NotMapped]
+        public string SalaryMonth => $"{dtYear}-{dtMonth:D2}"; // Formatted as yyyy-MM
 
-        public decimal Medical { get; set; }
+        [Required]
+        [Range(0, double.MaxValue)]
+        public decimal Gross { get; set; } // Gross salary
 
-        public decimal AbsentAmount { get; set; }
+        [Required]
+        [Range(0, double.MaxValue)]
+        public decimal Basic { get; set; } // Basic salary
 
-        public decimal PayableAmount { get; set; }
+        [Required]
+        [Range(0, double.MaxValue)]
+        public decimal Hrent { get; set; } // House rent
 
-        public bool IsPaid { get; set; } = false;
+        [Required]
+        [Range(0, double.MaxValue)]
+        public decimal Medical { get; set; } // Medical allowance
 
-        public decimal PaidAmount { get; set; } = 0;
+        [Range(0, 31)]
+        public int AbsentDays { get; set; } // Attendance summary data
 
-        public virtual required Company Company { get; set; }
-        public virtual required Employee Employee { get; set; }
+        [Required]
+        [Range(0, double.MaxValue)]
+        public decimal AbsentAmount { get; set; } // Calculated Absent Amount
+
+        [Required]
+        [Range(0, double.MaxValue)]
+        public decimal PayableAmount { get; set; } // Calculated Payable Amount
+
+        public bool IsPaid { get; set; } = false; // Paid or not
+
+        [Range(0, double.MaxValue)]
+        public decimal PaidAmount { get; set; } = 0; // Final paid amount
     }
 }

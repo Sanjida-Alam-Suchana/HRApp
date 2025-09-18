@@ -1,4 +1,4 @@
-namespace HRApp.Models
+namespace HRAPP.Models
 {
     public class ErrorViewModel
     {

@@ -8,7 +8,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace HRApp.Migrations
+namespace HRAPP.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
     partial class ApplicationDbContextModelSnapshot : ModelSnapshot
@@ -35,13 +35,7 @@ namespace HRApp.Migrations
                     b.Property<Guid>("ComId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("EmpId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("EmployeeId")
                         .HasColumnType("uuid");
 
                     b.Property<TimeOnly>("InTime")
@@ -55,148 +49,137 @@ namespace HRApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CompanyId");
+                    b.HasIndex("ComId");
 
-                    b.HasIndex("EmployeeId");
+                    b.HasIndex("EmpId");
 
                     b.ToTable("Attendances");
                 });
 
             modelBuilder.Entity("HRApp.Models.AttendanceSummary", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<Guid>("SummaryId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
-
-                    b.Property<int>("Absent")
-                        .HasColumnType("integer");
 
                     b.Property<Guid>("ComId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("CompanyId")
-                        .HasColumnType("uuid");
+                    b.Property<int>("DaysAbsent")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DaysLate")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DaysPresent")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("EmpId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("EmployeeId")
-                        .HasColumnType("uuid");
+                    b.Property<string>("Remarks")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
-                    b.Property<int>("Late")
+                    b.Property<DateTime>("SummaryMonth")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("TotalDays")
                         .HasColumnType("integer");
 
-                    b.Property<int>("Present")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("dtMonth")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("dtYear")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
+                    b.HasKey("SummaryId");
 
                     b.HasIndex("ComId");
 
-                    b.HasIndex("CompanyId");
-
                     b.HasIndex("EmpId");
-
-                    b.HasIndex("EmployeeId");
 
                     b.ToTable("AttendanceSummaries");
                 });
 
             modelBuilder.Entity("HRApp.Models.Company", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<Guid>("ComId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("Basic")
-                        .HasColumnType("numeric");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("ComName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
-                    b.Property<decimal>("HRent")
-                        .HasColumnType("numeric");
+                    b.Property<decimal>("Hrent")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<bool>("IsInactive")
                         .HasColumnType("boolean");
 
                     b.Property<decimal>("Medical")
-                        .HasColumnType("numeric");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
-                    b.HasKey("Id");
+                    b.HasKey("ComId");
 
                     b.ToTable("Companies");
                 });
 
             modelBuilder.Entity("HRApp.Models.Department", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<Guid>("DeptId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("ComId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("DeptName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
-                    b.HasKey("Id");
+                    b.HasKey("DeptId");
 
-                    b.HasIndex("CompanyId");
+                    b.HasIndex("ComId");
 
                     b.ToTable("Departments");
                 });
 
             modelBuilder.Entity("HRApp.Models.Designation", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<Guid>("DesigId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("ComId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("DesigName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
-                    b.HasKey("Id");
+                    b.HasKey("DesigId");
 
-                    b.HasIndex("CompanyId");
+                    b.HasIndex("ComId");
 
                     b.ToTable("Designations");
                 });
 
             modelBuilder.Entity("HRApp.Models.Employee", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<Guid>("EmpId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("Basic")
-                        .HasColumnType("numeric");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<Guid>("ComId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("DepartmentId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("DeptId")
@@ -205,47 +188,48 @@ namespace HRApp.Migrations
                     b.Property<Guid>("DesigId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("DesignationId")
-                        .HasColumnType("uuid");
+                    b.Property<DateTime>("DtJoin")
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("EmpCode")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("EmpName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
-                    b.Property<string>("Gender")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int>("Gender")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("Gross")
-                        .HasColumnType("numeric");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("HRent")
-                        .HasColumnType("numeric");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("Medical")
-                        .HasColumnType("numeric");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("Others")
-                        .HasColumnType("numeric");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<Guid>("ShiftId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("dtJoin")
-                        .HasColumnType("timestamp with time zone");
+                    b.HasKey("EmpId");
 
-                    b.HasKey("Id");
+                    b.HasIndex("ComId");
 
-                    b.HasIndex("CompanyId");
+                    b.HasIndex("DeptId");
 
-                    b.HasIndex("DepartmentId");
-
-                    b.HasIndex("DesignationId");
+                    b.HasIndex("DesigId");
 
                     b.HasIndex("ShiftId");
 
@@ -254,42 +238,44 @@ namespace HRApp.Migrations
 
             modelBuilder.Entity("HRApp.Models.Salary", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<Guid>("SalaryId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("AbsentAmount")
                         .HasColumnType("numeric");
 
+                    b.Property<int>("AbsentDays")
+                        .HasColumnType("integer");
+
                     b.Property<decimal>("Basic")
-                        .HasColumnType("numeric");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<Guid>("ComId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("CompanyId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("EmpId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("EmployeeId")
-                        .HasColumnType("uuid");
-
                     b.Property<decimal>("Gross")
-                        .HasColumnType("numeric");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
-                    b.Property<decimal>("HRent")
-                        .HasColumnType("numeric");
+                    b.Property<decimal>("Hrent")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<bool>("IsPaid")
                         .HasColumnType("boolean");
 
                     b.Property<decimal>("Medical")
-                        .HasColumnType("numeric");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("PaidAmount")
-                        .HasColumnType("numeric");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("PayableAmount")
                         .HasColumnType("numeric");
@@ -300,47 +286,38 @@ namespace HRApp.Migrations
                     b.Property<int>("dtYear")
                         .HasColumnType("integer");
 
-                    b.HasKey("Id");
+                    b.HasKey("SalaryId");
 
                     b.HasIndex("ComId");
 
-                    b.HasIndex("CompanyId");
-
                     b.HasIndex("EmpId");
-
-                    b.HasIndex("EmployeeId");
 
                     b.ToTable("Salaries");
                 });
 
             modelBuilder.Entity("HRApp.Models.Shift", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<Guid>("ShiftId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("ComId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<TimeOnly>("In")
-                        .HasColumnType("time without time zone");
-
-                    b.Property<TimeOnly>("Late")
-                        .HasColumnType("time without time zone");
-
-                    b.Property<TimeOnly>("Out")
+                    b.Property<TimeOnly>("EndTime")
                         .HasColumnType("time without time zone");
 
                     b.Property<string>("ShiftName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
-                    b.HasKey("Id");
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time without time zone");
 
-                    b.HasIndex("CompanyId");
+                    b.HasKey("ShiftId");
+
+                    b.HasIndex("ComId");
 
                     b.ToTable("Shifts");
                 });
@@ -349,13 +326,13 @@ namespace HRApp.Migrations
                 {
                     b.HasOne("HRApp.Models.Company", "Company")
                         .WithMany("Attendances")
-                        .HasForeignKey("CompanyId")
+                        .HasForeignKey("ComId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("HRApp.Models.Employee", "Employee")
                         .WithMany("Attendances")
-                        .HasForeignKey("EmployeeId")
+                        .HasForeignKey("EmpId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -367,24 +344,16 @@ namespace HRApp.Migrations
             modelBuilder.Entity("HRApp.Models.AttendanceSummary", b =>
                 {
                     b.HasOne("HRApp.Models.Company", "Company")
-                        .WithMany()
+                        .WithMany("AttendanceSummaries")
                         .HasForeignKey("ComId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("HRApp.Models.Company", null)
-                        .WithMany("AttendanceSummaries")
-                        .HasForeignKey("CompanyId");
-
                     b.HasOne("HRApp.Models.Employee", "Employee")
-                        .WithMany()
+                        .WithMany("AttendanceSummaries")
                         .HasForeignKey("EmpId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("HRApp.Models.Employee", null)
-                        .WithMany("AttendanceSummaries")
-                        .HasForeignKey("EmployeeId");
 
                     b.Navigation("Company");
 
@@ -395,7 +364,7 @@ namespace HRApp.Migrations
                 {
                     b.HasOne("HRApp.Models.Company", "Company")
                         .WithMany("Departments")
-                        .HasForeignKey("CompanyId")
+                        .HasForeignKey("ComId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -406,7 +375,7 @@ namespace HRApp.Migrations
                 {
                     b.HasOne("HRApp.Models.Company", "Company")
                         .WithMany("Designations")
-                        .HasForeignKey("CompanyId")
+                        .HasForeignKey("ComId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -417,24 +386,24 @@ namespace HRApp.Migrations
                 {
                     b.HasOne("HRApp.Models.Company", "Company")
                         .WithMany("Employees")
-                        .HasForeignKey("CompanyId")
+                        .HasForeignKey("ComId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("HRApp.Models.Department", "Department")
-                        .WithMany("Employees")
-                        .HasForeignKey("DepartmentId")
+                        .WithMany()
+                        .HasForeignKey("DeptId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("HRApp.Models.Designation", "Designation")
-                        .WithMany("Employees")
-                        .HasForeignKey("DesignationId")
+                        .WithMany()
+                        .HasForeignKey("DesigId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("HRApp.Models.Shift", "Shift")
-                        .WithMany("Employees")
+                        .WithMany()
                         .HasForeignKey("ShiftId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -451,24 +420,16 @@ namespace HRApp.Migrations
             modelBuilder.Entity("HRApp.Models.Salary", b =>
                 {
                     b.HasOne("HRApp.Models.Company", "Company")
-                        .WithMany()
+                        .WithMany("Salaries")
                         .HasForeignKey("ComId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("HRApp.Models.Company", null)
-                        .WithMany("Salaries")
-                        .HasForeignKey("CompanyId");
-
                     b.HasOne("HRApp.Models.Employee", "Employee")
-                        .WithMany()
+                        .WithMany("Salaries")
                         .HasForeignKey("EmpId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("HRApp.Models.Employee", null)
-                        .WithMany("Salaries")
-                        .HasForeignKey("EmployeeId");
 
                     b.Navigation("Company");
 
@@ -479,7 +440,7 @@ namespace HRApp.Migrations
                 {
                     b.HasOne("HRApp.Models.Company", "Company")
                         .WithMany("Shifts")
-                        .HasForeignKey("CompanyId")
+                        .HasForeignKey("ComId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -503,16 +464,6 @@ namespace HRApp.Migrations
                     b.Navigation("Shifts");
                 });
 
-            modelBuilder.Entity("HRApp.Models.Department", b =>
-                {
-                    b.Navigation("Employees");
-                });
-
-            modelBuilder.Entity("HRApp.Models.Designation", b =>
-                {
-                    b.Navigation("Employees");
-                });
-
             modelBuilder.Entity("HRApp.Models.Employee", b =>
                 {
                     b.Navigation("AttendanceSummaries");
@@ -520,11 +471,6 @@ namespace HRApp.Migrations
                     b.Navigation("Attendances");
 
                     b.Navigation("Salaries");
-                });
-
-            modelBuilder.Entity("HRApp.Models.Shift", b =>
-                {
-                    b.Navigation("Employees");
                 });
 #pragma warning restore 612, 618
         }

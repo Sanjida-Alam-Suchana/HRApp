@@ -1,0 +1,210 @@
+﻿@model IEnumerable<HRApp.Models.Designation>
+@{
+    ViewData["Title"] = "Designations";
+    var companies = ViewBag.Companies as List<HRApp.Models.Company>;
+}
+
+<div class="container mt-4">
+    <h2>Designations</h2>
+
+    <!-- Create Form -->
+    <div class="card mb-4 p-3">
+        <h4>Create New Designation</h4>
+        <form id="createForm">@Html.AntiForgeryToken()
+            <div class="form-group mb-2">
+                <label for="ComId">Company</label>
+                <select id="ComId" name="ComId" class="form-control">
+                    <option value="">Select Company</option>
+                    @foreach(var c in companies)
+                    {
+                        <option value="@c.ComId">@c.ComName</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group mb-2">
+                <label for="DesigName">Designation Name</label>
+                <input type="text" id="DesigName" name="DesigName" class="form-control"/>
+            </div>
+            <button type="submit" class="btn btn-primary">Create</button>
+        </form>
+    </div>
+
+    <!-- Company Filter -->
+    <div class="mb-3">
+        <select id="companyDropdown" class="form-select w-50">
+            <option value="">All Companies</option>
+            @foreach(var c in companies)
+            {
+                <option value="@c.ComId">@c.ComName</option>
+            }
+        </select>
+    </div>
+
+    <!-- Designation Table -->
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Designation Name</th>
+                <th>Company</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="designationTable">
+            @foreach(var d in Model)
+            {
+                var companyName = companies.FirstOrDefault(c => c.ComId == d.ComId)?.ComName ?? "N/A";
+                <tr id="row-@d.DesigId">
+                    <td>@d.DesigName</td>
+                    <td>@companyName</td>
+                    <td>
+                        <button class="btn btn-warning btn-sm" onclick="editDesignation('@d.DesigId')">Edit</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteDesignation('@d.DesigId')">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- AntiForgery for AJAX -->
+<form id="antiForgeryForm">@Html.AntiForgeryToken()</form>
+
+@section Scripts {
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+$(document).ready(function(){
+
+    // --- Create Designation ---
+    $("#createForm").submit(function(e){
+        e.preventDefault();
+        let formData = $(this).serialize();
+        console.log("Form data being sent:", formData); // Debug form data
+        let $button = $(this).find("button[type=submit]");
+        $button.text("Creating...").prop("disabled", true); // Update button text and disable
+        $.ajax({
+            url: '/Designations/DesignationCreate',
+            type: 'POST',
+            data: formData,
+            headers: { "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
+            success: function(res){
+                console.log("Create response:", res); // Debug server response
+                alert(res.message || "No message returned from server");
+                if (res.success && res.designation) {
+                    let d = res.designation;
+                    let newRow = `
+                        <tr id="row-${d.desigId}">
+                            <td>${d.desigName}</td>
+                            <td>${d.comName}</td>
+                            <td>
+                                <button class="btn btn-warning btn-sm" onclick="editDesignation('${d.desigId}')">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteDesignation('${d.desigId}')">Delete</button>
+                            </td>
+                        </tr>`;
+                    $("#designationTable").append(newRow);
+                    console.log("Row appended to table:", newRow); // Debug table update
+                    $("#createForm")[0].reset(); // Reset form
+                } else {
+                    console.error("Invalid response structure:", res);
+                    alert("Failed to update table. Check console for details.");
+                }
+            },
+            error: function(xhr, status, error){
+                console.error("Create error:", xhr.responseText, status, error);
+                alert("Failed to create designation: " + (xhr.responseJSON?.message || "Unknown error"));
+            },
+            complete: function(){
+                $button.text("Create").prop("disabled", false); // Restore button
+            }
+        });
+    });
+
+    // --- Company Filter ---
+    $("#companyDropdown").change(function(){
+        let comId = $(this).val();
+        $("#designationTable").empty();
+        let url = comId ? '/Designations/GetDesignationsByCompany?comId=' + comId : '/Designations/GetAllDesignations';
+        $.getJSON(url, function(data){
+            console.log("Filter response:", data); // Debug filter response
+            $.each(data, function(i, d){
+                let row = `
+                    <tr id="row-${d.desigId}">
+                        <td>${d.desigName}</td>
+                        <td>${d.comName}</td>
+                        <td>
+                            <button class="btn btn-warning btn-sm" onclick="editDesignation('${d.desigId}')">Edit</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteDesignation('${d.desigId}')">Delete</button>
+                        </td>
+                    </tr>`;
+                $("#designationTable").append(row);
+            });
+        }).fail(function(xhr, status, error){
+            console.error("Filter error:", xhr.responseText, status, error);
+            alert("Failed to filter designations: " + (xhr.responseJSON?.message || "Unknown error"));
+        });
+    });
+
+    // --- Delete Designation ---
+    window.deleteDesignation = function(id){
+        if(confirm("Delete this designation?")){
+            $.ajax({
+                url: '/Designations/Delete/' + id,
+                type: 'POST',
+                headers: { "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
+                success: function(res){
+                    alert(res.message || "No message returned from server");
+                    if(res.success){
+                        $("#row-" + id).remove();
+                    }
+                },
+                error: function(xhr, status, error){
+                    console.error("Delete error:", xhr.responseText, status, error);
+                    alert("Failed to delete designation: " + (xhr.responseJSON?.message || "Unknown error"));
+                }
+            });
+        }
+    }
+
+    // --- Edit Designation ---
+    window.editDesignation = function(id){
+        let row = $("#row-" + id);
+        let name = row.find("td:eq(0)").text();
+        let companyName = row.find("td:eq(1)").text();
+        let newName = prompt("Edit Designation Name:", name);
+        if (newName === null || newName.trim() === "") return;
+
+        let companyOptions = $("#companyDropdown option").map(function(){
+            return { value: $(this).val(), text: $(this).text() };
+        }).get().filter(opt => opt.value !== "");
+
+        let companyPrompt = "Select Company:\n" + companyOptions.map((opt, i) => `${i + 1}. ${opt.text} (${opt.value})`).join("\n");
+        let comIndex = prompt(companyPrompt, companyOptions.findIndex(opt => opt.text === companyName) + 1 || "1");
+        let comId = companyOptions[parseInt(comIndex) - 1]?.value || "";
+        
+        if (!comId) {
+            alert("Invalid company selection.");
+            return;
+        }
+
+        $.ajax({
+            url: '/Designations/DesignationEdit/' + id,
+            type: 'POST',
+            headers: { "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
+            data: { desigId: id, desigName: newName, comId: comId },
+            success: function(res){
+                console.log("Edit response:", res); // Debug edit response
+                alert(res.message || "No message returned from server");
+                if (res.success && res.designation){
+                    row.find("td:eq(0)").text(res.designation.desigName);
+                    row.find("td:eq(1)").text(res.designation.comName);
+                }
+            },
+            error: function(xhr, status, error){
+                console.error("Edit error:", xhr.responseText, status, error);
+                alert("Failed to edit designation: " + (xhr.responseJSON?.message || "Unknown error"));
+            }
+        });
+    }
+});
+</script>
+}

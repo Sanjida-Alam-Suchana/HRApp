@@ -1,0 +1,165 @@
+﻿@model IEnumerable<HRApp.Models.Company>
+
+@{
+    ViewData["Title"] = "Company List";
+}
+
+<div class="container mt-4">
+    <h2>Company List</h2>
+
+ <form id="createForm" class="mb-3">
+        @Html.AntiForgeryToken()
+        <div class="row g-2">
+            <div class="col">
+                <input type="text" class="form-control" name="ComName" placeholder="Company Name" required />
+            </div>
+            <div class="col">
+                <input type="number" class="form-control" name="Basic" placeholder="Basic" required />
+            </div>
+            <div class="col">
+                <input type="number" class="form-control" name="Hrent" placeholder="House Rent" required />
+            </div>
+            <div class="col">
+                <input type="number" class="form-control" name="Medical" placeholder="Medical" required />
+            </div>
+            <div class="col">
+                <input type="hidden" name="IsInactive" value="false" />
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="IsInactive" name="IsInactive" value="true" />
+                    <label class="form-check-label" for="IsInactive">Is Inactive</label>
+                </div>
+            </div>
+            <div class="col">
+                <button type="submit" class="btn btn-primary">Create</button>
+            </div>
+        </div>
+    </form>
+
+    <!-- COMPANY TABLE -->
+    <table class="table table-bordered" id="companyTable">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Basic</th>
+                <th>Hrent</th>
+                <th>Medical</th>
+                <th>IsInactive</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in Model)
+            {
+                <tr id="row-@c.ComId">
+                    <td>@c.ComName</td>
+                    <td>@c.Basic</td>
+                    <td>@c.Hrent</td>
+                    <td>@c.Medical</td>
+                    <td>@(c.IsInactive ? "Yes" : "No")</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning editBtn" data-id="@c.ComId">Edit</button>
+                        <button class="btn btn-sm btn-danger deleteBtn" data-id="@c.ComId">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+
+$(document).ready(function () {
+
+    // CREATE
+    $("#createForm").submit(function (e) {
+        e.preventDefault();
+
+        $.ajax({
+            url: '/Companies/CompanyCreate',
+            type: 'POST',
+            data: $(this).serialize(),
+            success: function (response) {
+                if (response.success) {
+                    // Append new row
+                    $("#companyTable tbody").append(`
+                        <tr id="row-${response.company.comId}">
+                            <td>${response.company.comName}</td>
+                            <td>${response.company.basic}</td>
+                            <td>${response.company.hrent}</td>
+                            <td>${response.company.medical}</td>
+                            <td>${response.company.isInactive ? "Yes" : "No"}</td>
+                            <td>
+                                <button class="btn btn-sm btn-warning editBtn" data-id="${response.company.comId}">Edit</button>
+                                <button class="btn btn-sm btn-danger deleteBtn" data-id="${response.company.comId}">Delete</button>
+                            </td>
+                        </tr>
+                    `);
+
+                    // Reset form
+                    $("#createForm")[0].reset();
+
+                    alert(response.message);
+                } else {
+                    alert(response.message);
+                }
+            },
+            error: function () {
+                alert("Something went wrong!");
+            }
+        });
+    });
+});
+
+            // DELETE
+            $(document).on("click", ".deleteBtn", function () {
+                const id = $(this).data("id");
+                if (confirm("Are you sure?")) {
+                    $.post("/Companies/Delete/" + id, { __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val() }, function (res) {
+                        alert(res.message);
+                        if (res.success) $("#row-" + id).remove();
+                    });
+                }
+            });
+
+            // EDIT via prompt (simple)
+            $(document).on("click", ".editBtn", function () {
+                const id = $(this).data("id");
+                const row = $("#row-" + id);
+                const newName = prompt("Edit Company Name:", row.find("td:eq(0)").text());
+                const newBasic = prompt("Edit Basic:", row.find("td:eq(1)").text());
+                const newHrent = prompt("Edit Hrent:", row.find("td:eq(2)").text());
+                const newMedical = prompt("Edit Medical:", row.find("td:eq(3)").text());
+                const newInactive = confirm("Mark as inactive?");
+
+                if (newName != null) {
+                    const data = {
+                        ComId: id,
+                        ComName: newName,
+                        Basic: newBasic,
+                        Hrent: newHrent,
+                        Medical: newMedical,
+                        IsInactive: newInactive
+                    };
+                    $.ajax({
+                        url: '/Companies/CompanyEdit/' + id,
+                        type: 'POST',
+                        data: data,
+                        headers: { "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').val() },
+                        success: function (res) {
+                            alert(res.message);
+                            if (res.success) {
+                                row.find("td:eq(0)").text(data.ComName);
+                                row.find("td:eq(1)").text(data.Basic);
+                                row.find("td:eq(2)").text(data.Hrent);
+                                row.find("td:eq(3)").text(data.Medical);
+                                row.find("td:eq(4)").text(data.IsInactive);
+                            }
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+}

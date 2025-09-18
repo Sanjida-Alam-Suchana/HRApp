@@ -1,28 +1,32 @@
+using System.Diagnostics;
+using HRAPP.Models;
 using Microsoft.AspNetCore.Mvc;
-using HRApp.Repositories;
-using Microsoft.Extensions.Caching.Memory;
-using System;
-using System.Threading.Tasks;
 
-namespace HRApp.Controllers
+namespace HRAPP.Controllers
 {
-    public class HomeController(IUnitOfWork unitOfWork, IMemoryCache cache) : Controller
+    public class HomeController : Controller
     {
-        private readonly IUnitOfWork _unitOfWork = unitOfWork;
-        private readonly IMemoryCache _cache = cache;
+        private readonly ILogger<HomeController> _logger;
+
+        public HomeController(ILogger<HomeController> logger)
+        {
+            _logger = logger;
+        }
 
         public IActionResult Index()
         {
-            ViewBag.Companies = _unitOfWork.Companies.GetAll().Select(c => new { c.Id, c.ComName }).ToList();
-            ViewBag.SelectedCompanyId = _cache.TryGetValue("SelectedCompanyId", out Guid selectedId) ? selectedId : Guid.Empty;
             return View();
         }
 
-        [HttpPost]
-        public JsonResult SetSelectedCompany(Guid companyId)
+        public IActionResult Privacy()
         {
-            _cache.Set("SelectedCompanyId", companyId, TimeSpan.FromDays(1));
-            return Json(new { success = true });
+            return View();
+        }
+
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public IActionResult Error()
+        {
+            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
     }
 }

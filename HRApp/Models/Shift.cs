@@ -1,24 +1,27 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HRApp.Models
 {
     public class Shift
     {
         [Key]
-        public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid ShiftId { get; set; } = Guid.NewGuid();
 
-        public Guid ComId { get; set; }
+        [ForeignKey("Company")] // Declare ComId as Foreign Key referencing Company.ComId
+        public Guid ComId { get; set; } // Foreign Key to Company
 
         [Required]
+        [StringLength(100)]
         public required string ShiftName { get; set; }
 
-        public TimeOnly In { get; set; }
+        [Required]
+        public TimeOnly StartTime { get; set; }
 
-        public TimeOnly Out { get; set; }
+        [Required]
+        public TimeOnly EndTime { get; set; }
 
-        public TimeOnly Late { get; set; }
-
-        public virtual required Company Company { get; set; }
-        public virtual required ICollection<Employee> Employees { get; set; }
+        // Navigation property
+        public virtual Company Company { get; set; }
     }
 }

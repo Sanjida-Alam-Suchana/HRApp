@@ -1,28 +1,46 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HRApp.Models
 {
     public class AttendanceSummary
     {
-
         [Key]
-        public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid SummaryId { get; set; } = Guid.NewGuid();
 
-        public Guid EmpId { get; set; }
+        [Required]
+        public Guid EmpId { get; set; } // Foreign Key to Employee
 
-        public Guid ComId { get; set; }
+        [ForeignKey("EmpId")]
+        public virtual Employee? Employee { get; set; }
 
-        public int dtYear { get; set; }
+        [Required]
+        public Guid ComId { get; set; } // Foreign Key to Company
 
-        public int dtMonth { get; set; }
+        [ForeignKey("ComId")] // Points to the foreign key property ComId
+        public virtual Company? Company { get; set; }
 
-        public int Present { get; set; }
+        [Required]
+        [DataType(DataType.Date)]
+        [DisplayFormat(DataFormatString = "{0:yyyy-MM}", ApplyFormatInEditMode = true)]
+        public DateTime SummaryMonth { get; set; } // Summary month with proper formatting (year-month)
 
-        public int Late { get; set; }
+        [Required]
+        public int TotalDays { get; set; } // Total working days in the month
 
-        public int Absent { get; set; }
+        [Required]
+        [Range(0, int.MaxValue)]
+        public int DaysPresent { get; set; } // Number of days present
 
-        public virtual required Employee Employee { get; set; }
-        public virtual required Company Company { get; set; }
+        [Required]
+        [Range(0, int.MaxValue)]
+        public int DaysAbsent { get; set; } // Number of days absent
+
+        [Required]
+        [Range(0, int.MaxValue)]
+        public int DaysLate { get; set; } // Number of days late
+
+        [StringLength(500)]
+        public string? Remarks { get; set; } // Optional remarks
     }
 }
