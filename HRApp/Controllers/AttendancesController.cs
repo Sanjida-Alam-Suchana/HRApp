@@ -22,31 +22,43 @@ namespace HRApp.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Summarize(Guid? comId, int year, int month)
+        public async Task<IActionResult> AttendanceSummaryGenerate(Guid? comId, string summaryMonth)
         {
-            if (comId is null && Guid.TryParse(Request.Cookies["comId"], out var gid)) comId = gid;
             if (comId is null) return BadRequest("Company not selected.");
+            if (string.IsNullOrEmpty(summaryMonth)) return BadRequest("Month not selected.");
 
-            await _unitOfWork.ExecRawAsync("CALL sp_attendance_summarize({0}, {1}, {2})",
-                comId.Value, year, month);
+            var date = DateTime.ParseExact(summaryMonth, "yyyy-MM", null);
+            int year = date.Year;
+            int month = date.Month;
 
+            await _unitOfWork.ExecRawAsync("CALL CalculateAttendanceSummary({0}, {1}, {2})", comId.Value, year, month);
             return Ok(new { ok = true });
         }
 
+        // POST: Salaries/Calculate
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CalculateSalary(Guid? comId, int year, int month)
+        public async Task<IActionResult> Calculate(Guid comId, int dtYear, int dtMonth)
         {
-            if (comId is null && Guid.TryParse(Request.Cookies["comId"], out var gid)) comId = gid;
-            if (comId is null) return BadRequest("Company not selected.");
+            if (comId == Guid.Empty || dtYear <= 0 || dtMonth < 1 || dtMonth > 12)
+            {
+                return Json(new { success = false, message = "Invalid parameters." });
+            }
 
-            await _unitOfWork.ExecRawAsync("CALL sp_attendance_summarize({0}, {1}, {2})",
-                comId.Value, year, month);
-
-            await _unitOfWork.ExecRawAsync("CALL sp_salary_calculate({0}, {1}, {2})",
-                comId.Value, year, month);
-
-            return Ok(new { ok = true });
+            try
+            {
+                await _unitOfWork.ExecRawAsync("CALL \"CalculateSalary\"({0}, {1}, {2})", comId, dtYear, dtMonth);
+                var salaries = await _unitOfWork.Salaries
+                    .GetQueryable()
+                    .Where(s => s.ComId == comId && s.dtYear == dtYear && s.dtMonth == dtMonth)
+                    .Include(s => s.Employee)
+                    .ToListAsync();
+                return Json(new { success = true, message = "Salary calculated successfully!", data = salaries });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
+            }
         }
 
         public async Task<IActionResult> AttendanceIndex()

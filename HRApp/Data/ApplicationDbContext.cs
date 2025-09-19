@@ -3,11 +3,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HRApp.Data
 {
-    public class ApplicationDbContext : DbContext
+    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
     {
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
-        {
-        }
 
         // DbSets
         public DbSet<Company> Companies { get; set; }
@@ -27,7 +24,7 @@ namespace HRApp.Data
             modelBuilder.Entity<Company>(entity =>
             {
                 entity.Property(e => e.Basic).HasPrecision(18, 2);
-                entity.Property(e => e.Hrent).HasPrecision(18, 2);
+                entity.Property(e => e.HRent).HasPrecision(18, 2);
                 entity.Property(e => e.Medical).HasPrecision(18, 2);
             });
 
@@ -48,7 +45,7 @@ namespace HRApp.Data
             {
                 entity.Property(e => e.Basic).HasPrecision(18, 2);
                 entity.Property(e => e.Gross).HasPrecision(18, 2);
-                entity.Property(e => e.Hrent).HasPrecision(18, 2);
+                entity.Property(e => e.HRent).HasPrecision(18, 2);
                 entity.Property(e => e.Medical).HasPrecision(18, 2);
                 entity.Property(e => e.PaidAmount).HasPrecision(18, 2);
             });

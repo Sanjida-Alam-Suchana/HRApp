@@ -1,0 +1,29 @@
+﻿@model IEnumerable<object>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Employee Name</th>
+            <th>Gross</th>
+            <th>Basic</th>
+            <th>HR</th>
+            <th>MA</th>
+            <th>Absent Amount</th>
+            <th>Payable Amount</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var sal in Model)
+        {
+            <tr>
+                <td>@sal.GetType().GetProperty("EmployeeName").GetValue(sal)</td>
+                <td>@sal.GetType().GetProperty("Gross").GetValue(sal)</td>
+                <td>@sal.GetType().GetProperty("Basic").GetValue(sal)</td>
+                <td>@sal.GetType().GetProperty("HRent").GetValue(sal)</td>
+                <td>@sal.GetType().GetProperty("Medical").GetValue(sal)</td>
+                <td>@sal.GetType().GetProperty("AbsentAmount").GetValue(sal)</td>
+                <td>@sal.GetType().GetProperty("PayableAmount").GetValue(sal)</td>
+            </tr>
+        }
+    </tbody>
+</table>

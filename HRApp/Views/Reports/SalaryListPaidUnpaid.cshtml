@@ -1,0 +1,184 @@
+﻿@model dynamic
+@{
+    ViewData["Title"] = "Salary List — Filter by Department, Month, and Paid/Unpaid";
+    var companies = ViewBag.Companies as IEnumerable<HRApp.Models.Company>;
+    var selectedComId = ViewBag.SelectedComId as string;
+}
+
+<h2>Salary List — filter by Department, Month, and Paid/Unpaid</h2>
+
+<div class="form-group">
+    <label>Company</label>
+    <select id="companySelect" class="form-control">
+        <option value="">-- Select company --</option>
+        @foreach (var company in companies ?? Enumerable.Empty<HRApp.Models.Company>())
+        {
+            var isSelected = company.ComId.ToString() == selectedComId;
+            <option value="@company.ComId" selected="@(isSelected ? "selected" : null)">
+                @company.ComName
+            </option>
+        }
+    </select>
+</div>
+
+<div class="form-group">
+    <label>Department</label>
+    <select id="departmentSelect" class="form-control">
+        <option value="">-- All departments --</option>
+    </select>
+</div>
+
+<div class="form-group">
+    <label>Year</label>
+    <input type="number" id="year" class="form-control" min="2000" max="2100" value="@DateTime.Now.Year" />
+    <label>Month</label>
+    <select id="month" class="form-control">
+        @for (int m = 1; m <= 12; m++)
+        {
+            <option value="@m">@m</option>
+        }
+    </select>
+</div>
+
+<div class="form-group">
+    <label>Paid Status</label>
+    <select id="paidStatus" class="form-control">
+        <option value="">-- All --</option>
+        <option value="true">Paid</option>
+        <option value="false">Unpaid</option>
+    </select>
+</div>
+
+<button id="loadBtn" class="btn btn-primary">Load</button>
+<button id="resetBtn" class="btn btn-secondary">Reset</button>
+<button id="printBtn" class="btn btn-warning">Print</button>
+<button id="pdfBtn" class="btn btn-danger">Download PDF</button>
+<button id="csvBtn" class="btn btn-success">CSV</button>
+<button id="excelBtn" class="btn btn-info">Excel</button>
+
+<table id="salaryTable" class="table table-striped mt-3" style="display:none;">
+    <thead>
+        <tr>
+            <th>Employee Name</th>
+            <th>Gross</th>
+            <th>Basic</th>
+            <th>HR</th>
+            <th>MA</th>
+            <th>Absent Amount</th>
+            <th>Payable Amount</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+@section Scripts {
+<script>
+    $(document).ready(function () {
+        var initialCompanyId = $('#companySelect').val();
+        if (initialCompanyId) loadDepartments(initialCompanyId);
+
+        $('#companySelect').change(function () {
+            var companyId = $(this).val();
+            document.cookie = "SelectedComId=" + companyId + "; path=/";
+            loadDepartments(companyId);
+        });
+
+        function loadDepartments(companyId) {
+            if (companyId) {
+                $.ajax({
+                    url: '/Reports/GetDepartmentsByCompany',
+                    type: 'GET',
+                    data: { companyId: companyId },
+                    success: function (data) {
+                        $('#departmentSelect').html('<option value="">-- All departments --</option>');
+                        $.each(data, function (i, dept) {
+                            $('#departmentSelect').append(
+                                '<option value="' + dept.id + '">' + dept.name + '</option>'
+                            );
+                        });
+                    }
+                });
+            } else {
+                $('#departmentSelect').html('<option value="">-- All departments --</option>');
+            }
+        }
+
+        $('#loadBtn').click(function () {
+            var companyId = $('#companySelect').val();
+            var departmentId = $('#departmentSelect').val();
+            var year = $('#year').val();
+            var month = $('#month').val();
+            var paidStatus = $('#paidStatus').val();
+            var isPaid = (paidStatus === '') ? null : (paidStatus === 'true');
+            if (!companyId) { alert('Select a company'); return; }
+
+            $.ajax({
+                url: '/Reports/GetSalaryListPaidUnpaid',
+                type: 'POST',
+                data: { companyId: companyId, departmentId: departmentId, year: year, month: month, isPaid: isPaid },
+                success: function (data) {
+                    $('#salaryTable tbody').empty();
+                    $.each(data, function (i, item) {
+                        $('#salaryTable tbody').append(
+                            '<tr><td>' + item.employeeName + '</td><td>' + item.gross + '</td><td>' +
+                            item.basic + '</td><td>' + item.hRent + '</td><td>' + item.medical + '</td><td>' +
+                            item.absentAmount + '</td><td>' + item.payableAmount + '</td></tr>'
+                        );
+                    });
+                    $('#salaryTable').show();
+                }
+            });
+        });
+
+        $('#resetBtn').click(function () {
+            $('#companySelect').val('');
+            $('#departmentSelect').html('<option value="">-- All departments --</option>');
+            $('#year').val('@DateTime.Now.Year');
+            $('#month').val('1');
+            $('#paidStatus').val('');
+            $('#salaryTable').hide();
+        });
+
+        $('#printBtn').click(function () { window.print(); });
+
+        $('#pdfBtn').click(function () {
+            var companyId = $('#companySelect').val();
+            var departmentId = $('#departmentSelect').val() || '';
+            var year = $('#year').val();
+            var month = $('#month').val();
+            var paidStatus = $('#paidStatus').val();
+            var isPaid = (paidStatus === '') ? null : (paidStatus === 'true');
+            if (!companyId) { alert('Select a company'); return; }
+            var url = '/Reports/DownloadSalaryListPaidUnpaidPdf?companyId=' + companyId + '&departmentId=' + departmentId + '&year=' + year + '&month=' + month;
+            if (isPaid !== null) url += '&isPaid=' + isPaid;
+            window.location = url;
+        });
+
+        $('#csvBtn').click(function () {
+            var companyId = $('#companySelect').val();
+            var departmentId = $('#departmentSelect').val() || '';
+            var year = $('#year').val();
+            var month = $('#month').val();
+            var paidStatus = $('#paidStatus').val();
+            var isPaid = (paidStatus === '') ? null : (paidStatus === 'true');
+            if (!companyId) { alert('Select a company'); return; }
+            var url = '/Reports/DownloadSalaryListPaidUnpaidCsv?companyId=' + companyId + '&departmentId=' + departmentId + '&year=' + year + '&month=' + month;
+            if (isPaid !== null) url += '&isPaid=' + isPaid;
+            window.location = url;
+        });
+
+        $('#excelBtn').click(function () {
+            var companyId = $('#companySelect').val();
+            var departmentId = $('#departmentSelect').val() || '';
+            var year = $('#year').val();
+            var month = $('#month').val();
+            var paidStatus = $('#paidStatus').val();
+            var isPaid = (paidStatus === '') ? null : (paidStatus === 'true');
+            if (!companyId) { alert('Select a company'); return; }
+            var url = '/Reports/DownloadSalaryListPaidUnpaidExcel?companyId=' + companyId + '&departmentId=' + departmentId + '&year=' + year + '&month=' + month;
+            if (isPaid !== null) url += '&isPaid=' + isPaid;
+            window.location = url;
+        });
+    });
+</script>
+}

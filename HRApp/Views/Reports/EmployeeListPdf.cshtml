@@ -1,0 +1,27 @@
+﻿@model IEnumerable<object>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Employee Name</th>
+            <th>Join Date</th>
+            <th>Service Days</th>
+            <th>Department Name</th>
+            <th>Designation Name</th>
+            <th>Shift Name</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var emp in Model)
+        {
+            <tr>
+                <td>@emp.GetType().GetProperty("EmployeeName").GetValue(emp)</td>
+                <td>@emp.GetType().GetProperty("JoinDate").GetValue(emp)</td>
+                <td>@emp.GetType().GetProperty("ServiceDays").GetValue(emp)</td>
+                <td>@emp.GetType().GetProperty("DepartmentName").GetValue(emp)</td>
+                <td>@emp.GetType().GetProperty("DesignationName").GetValue(emp)</td>
+                <td>@emp.GetType().GetProperty("ShiftName").GetValue(emp)</td>
+            </tr>
+        }
+    </tbody>
+</table>

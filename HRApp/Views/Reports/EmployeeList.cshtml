@@ -1,0 +1,138 @@
+﻿@model dynamic
+@{
+    ViewData["Title"] = "Employee List — filter by Department";
+    var companies = ViewBag.Companies as IEnumerable<HRApp.Models.Company>;
+    var selectedComId = ViewBag.SelectedComId as string;
+}
+
+<h2>Employee List — filter by Department</h2>
+
+<div class="form-group">
+    <label>Company</label>
+    <select id="companySelect" class="form-control">
+        <option value="">-- Select company --</option>
+        @foreach (var company in companies ?? Enumerable.Empty<HRApp.Models.Company>())
+        {
+            var isSelected = company.ComId.ToString() == selectedComId;
+            <option value="@company.ComId" selected="@(isSelected ? "selected" : null)">
+                @company.ComName
+            </option>
+        }
+    </select>
+</div>
+
+<div class="form-group">
+    <label>Department</label>
+    <select id="departmentSelect" class="form-control">
+        <option value="">-- All departments --</option>
+    </select>
+</div>
+
+<button id="loadBtn" class="btn btn-primary">Load</button>
+<button id="resetBtn" class="btn btn-secondary">Reset</button>
+<button id="printBtn" class="btn btn-warning">Print</button>
+<button id="pdfBtn" class="btn btn-danger">Download PDF</button>
+<button id="csvBtn" class="btn btn-success">CSV</button>
+<button id="excelBtn" class="btn btn-info">Excel</button>
+
+<table id="employeeTable" class="table table-striped mt-3" style="display:none;">
+    <thead>
+        <tr>
+            <th>Employee Name</th>
+            <th>Join Date</th>
+            <th>Service Days</th>
+            <th>Department Name</th>
+            <th>Designation Name</th>
+            <th>Shift Name</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+@section Scripts {
+<script>
+    $(document).ready(function () {
+        var initialCompanyId = $('#companySelect').val();
+        if (initialCompanyId) {
+            loadDepartments(initialCompanyId);
+        }
+
+        $('#companySelect').change(function () {
+            var companyId = $(this).val();
+            document.cookie = "SelectedComId=" + companyId + "; path=/";
+            loadDepartments(companyId);
+        });
+
+        function loadDepartments(companyId) {
+            if (companyId) {
+                $.ajax({
+                    url: '/Reports/GetDepartmentsByCompany',
+                    type: 'GET',
+                    data: { companyId: companyId },
+                    success: function (data) {
+                        $('#departmentSelect').html('<option value="">-- All departments --</option>');
+                        $.each(data, function (i, dept) {
+                            $('#departmentSelect').append(
+                                '<option value="' + dept.id + '">' + dept.name + '</option>'
+                            );
+                        });
+                    }
+                });
+            } else {
+                $('#departmentSelect').html('<option value="">-- All departments --</option>');
+            }
+        }
+
+        $('#loadBtn').click(function () {
+            var companyId = $('#companySelect').val();
+            var departmentId = $('#departmentSelect').val();
+            if (!companyId) { alert('Select a company'); return; }
+            $.ajax({
+                url: '/Reports/GetEmployeeList',
+                type: 'POST',
+                data: { companyId: companyId, departmentId: departmentId },
+                success: function (data) {
+                    $('#employeeTable tbody').empty();
+                    $.each(data, function (i, emp) {
+                        $('#employeeTable tbody').append(
+                            '<tr><td>' + emp.employeeName + '</td><td>' + emp.joinDate + '</td><td>' +
+                            emp.serviceDays + '</td><td>' + emp.departmentName + '</td><td>' +
+                            emp.designationName + '</td><td>' + emp.shiftName + '</td></tr>'
+                        );
+                    });
+                    $('#employeeTable').show();
+                }
+            });
+        });
+
+        $('#resetBtn').click(function () {
+            $('#companySelect').val('');
+            $('#departmentSelect').html('<option value="">-- All departments --</option>');
+            $('#employeeTable').hide();
+        });
+
+        $('#printBtn').click(function () { window.print(); });
+
+        $('#pdfBtn').click(function () {
+            var companyId = $('#companySelect').val();
+            var departmentId = $('#departmentSelect').val() || '';
+            if (!companyId) { alert('Select a company'); return; }
+            window.location = '/Reports/DownloadEmployeeListPdf?companyId=' + companyId + '&departmentId=' + departmentId;
+        });
+
+        $('#csvBtn').click(function () {
+            var companyId = $('#companySelect').val();
+            var departmentId = $('#departmentSelect').val() || '';
+            if (!companyId) { alert('Select a company'); return; }
+            window.location = '/Reports/DownloadEmployeeListCsv?companyId=' + companyId + '&departmentId=' + departmentId;
+        });
+
+        $('#excelBtn').click(function () {
+            var companyId = $('#companySelect').val();
+            var departmentId = $('#departmentSelect').val() || '';
+            if (!companyId) { alert('Select a company'); return; }
+            window.location = '/Reports/DownloadEmployeeListExcel?companyId=' + companyId + '&departmentId=' + departmentId;
+        });
+    });
+</script>
+}

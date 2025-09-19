@@ -50,10 +50,21 @@
                          <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Salaries" asp-action="SalaryIndex">Salary</a>
                         </li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
+                        <li class="nav-item dropdown">
+            
+               <a class="nav-link dropdown-toggle" href="#" id="reportsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    Reports
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="reportsDropdown">
+                    <li><a class="dropdown-item" asp-controller="Reports" asp-action="EmployeeList">Employee List</a></li>
+                    <li><a class="dropdown-item" asp-controller="Reports" asp-action="AttendanceList">Attendance List</a></li>
+                    <li><a class="dropdown-item" asp-controller="Reports" asp-action="SalaryList">Salary List</a></li>
+                    <li><a class="dropdown-item" asp-controller="Reports" asp-action="SalaryListPaidUnpaid">Salary List (Paid/Unpaid)</a></li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+</nav>
     </header>
     <div class="container">
         <main role="main" class="pb-3">

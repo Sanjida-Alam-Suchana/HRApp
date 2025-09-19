@@ -18,7 +18,7 @@ namespace HRAPP.Migrations
                     ComId = table.Column<Guid>(type: "uuid", nullable: false),
                     ComName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     Basic = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
-                    Hrent = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                    HRent = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     Medical = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     IsInactive = table.Column<bool>(type: "boolean", nullable: false)
                 },
@@ -200,7 +200,7 @@ namespace HRAPP.Migrations
                     dtYear = table.Column<int>(type: "integer", nullable: false),
                     dtMonth = table.Column<int>(type: "integer", nullable: false),
                     Basic = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
-                    Hrent = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                    HRent = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     Medical = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     Gross = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     AbsentDays = table.Column<int>(type: "integer", nullable: false),

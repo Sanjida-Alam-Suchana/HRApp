@@ -41,7 +41,7 @@ namespace HRApp.Models
 
         [Required]
         [Range(0, double.MaxValue)]
-        public decimal Hrent { get; set; } // House rent
+        public decimal HRent { get; set; } // House rent
 
         [Required]
         [Range(0, double.MaxValue)]

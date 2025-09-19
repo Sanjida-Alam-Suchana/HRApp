@@ -74,7 +74,7 @@ namespace HRApp.Controllers
 
             // Calculate salary components (assuming non-nullable decimal properties in Company)
             employee.Basic = employee.Gross * (company.Basic > 0 ? company.Basic : 0.5m);
-            employee.HRent = employee.Gross * (company.Hrent > 0 ? company.Hrent : 0.3m);
+            employee.HRent = employee.Gross * (company.HRent > 0 ? company.HRent : 0.3m);
             employee.Medical = employee.Gross * (company.Medical > 0 ? company.Medical : 0.15m);
             employee.Others = employee.Gross * 0.05m;
 
@@ -158,7 +158,7 @@ namespace HRApp.Controllers
 
             // Recalculate salary components (assuming non-nullable decimal properties in Company)
             existingEmployee.Basic = existingEmployee.Gross * (company.Basic > 0 ? company.Basic : 0.5m);
-            existingEmployee.HRent = existingEmployee.Gross * (company.Hrent > 0 ? company.Hrent : 0.3m);
+            existingEmployee.HRent = existingEmployee.Gross * (company.HRent > 0 ? company.HRent : 0.3m);
             existingEmployee.Medical = existingEmployee.Gross * (company.Medical > 0 ? company.Medical : 0.15m);
             existingEmployee.Others = existingEmployee.Gross * 0.05m;
 

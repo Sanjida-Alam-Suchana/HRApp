@@ -18,7 +18,7 @@ namespace HRApp.Models
 
         [Required]
         [Range(0, 1)]
-        public decimal Hrent { get; set; } // e.g., 0.3 for 30%
+        public decimal HRent { get; set; } // e.g., 0.3 for 30%
 
         [Required]
         [Range(0, 1)]

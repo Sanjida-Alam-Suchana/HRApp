@@ -1,0 +1,152 @@
+﻿@model dynamic
+@{
+    ViewData["Title"] = "Attendance List — Filter by Department and Date Range";
+    var companies = ViewBag.Companies as IEnumerable<HRApp.Models.Company>;
+    var selectedComId = ViewBag.SelectedComId as string;
+}
+
+<h2>Attendance List — filter by Department and Date Range</h2>
+
+<div class="form-group">
+    <label>Company</label>
+    <select id="companySelect" class="form-control">
+        <option value="">-- Select company --</option>
+        @foreach (var company in companies ?? Enumerable.Empty<HRApp.Models.Company>())
+        {
+            var isSelected = company.ComId.ToString() == selectedComId;
+            <option value="@company.ComId" selected="@(isSelected ? "selected" : null)">
+                @company.ComName
+            </option>
+        }
+    </select>
+</div>
+
+<div class="form-group">
+    <label>Department</label>
+    <select id="departmentSelect" class="form-control">
+        <option value="">-- All departments --</option>
+    </select>
+</div>
+
+<div class="form-group">
+    <label>From Date</label>
+    <input type="date" id="fromDate" class="form-control" />
+    <label>To Date</label>
+    <input type="date" id="toDate" class="form-control" />
+</div>
+
+<button id="loadBtn" class="btn btn-primary">Load</button>
+<button id="resetBtn" class="btn btn-secondary">Reset</button>
+<button id="printBtn" class="btn btn-warning">Print</button>
+<button id="pdfBtn" class="btn btn-danger">Download PDF</button>
+<button id="csvBtn" class="btn btn-success">CSV</button>
+<button id="excelBtn" class="btn btn-info">Excel</button>
+
+<table id="attendanceTable" class="table table-striped mt-3" style="display:none;">
+    <thead>
+        <tr>
+            <th>Employee Name</th>
+            <th>Total Present</th>
+            <th>Total Absent</th>
+            <th>Total Late</th>
+            <th>Total Absent (Again)</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+@section Scripts {
+<script>
+    $(document).ready(function () {
+        var initialCompanyId = $('#companySelect').val();
+        if (initialCompanyId) loadDepartments(initialCompanyId);
+
+        $('#companySelect').change(function () {
+            var companyId = $(this).val();
+            document.cookie = "SelectedComId=" + companyId + "; path=/";
+            loadDepartments(companyId);
+        });
+
+        function loadDepartments(companyId) {
+            if (companyId) {
+                $.ajax({
+                    url: '/Reports/GetDepartmentsByCompany',
+                    type: 'GET',
+                    data: { companyId: companyId },
+                    success: function (data) {
+                        $('#departmentSelect').html('<option value="">-- All departments --</option>');
+                        $.each(data, function (i, dept) {
+                            $('#departmentSelect').append(
+                                '<option value="' + dept.id + '">' + dept.name + '</option>'
+                            );
+                        });
+                    }
+                });
+            } else {
+                $('#departmentSelect').html('<option value="">-- All departments --</option>');
+            }
+        }
+
+        $('#loadBtn').click(function () {
+            var companyId = $('#companySelect').val();
+            var departmentId = $('#departmentSelect').val();
+            var fromDate = $('#fromDate').val();
+            var toDate = $('#toDate').val();
+            if (!companyId) { alert('Select a company'); return; }
+
+            $.ajax({
+                url: '/Reports/GetAttendanceList',
+                type: 'POST',
+                data: { companyId: companyId, departmentId: departmentId, fromDate: fromDate, toDate: toDate },
+                success: function (data) {
+                    $('#attendanceTable tbody').empty();
+                    $.each(data, function (i, item) {
+                        $('#attendanceTable tbody').append(
+                            '<tr><td>' + item.employeeName + '</td><td>' + item.totalPresent + '</td><td>' +
+                            item.totalAbsent + '</td><td>' + item.totalLate + '</td><td>' + item.totalAbsentAgain + '</td></tr>'
+                        );
+                    });
+                    $('#attendanceTable').show();
+                }
+            });
+        });
+
+        $('#resetBtn').click(function () {
+            $('#companySelect').val('');
+            $('#departmentSelect').html('<option value="">-- All departments --</option>');
+            $('#fromDate').val('');
+            $('#toDate').val('');
+            $('#attendanceTable').hide();
+        });
+
+        $('#printBtn').click(function () { window.print(); });
+
+        $('#pdfBtn').click(function () {
+            var companyId = $('#companySelect').val();
+            var departmentId = $('#departmentSelect').val() || '';
+            var from = $('#fromDate').val();
+            var to = $('#toDate').val();
+            if (!companyId) { alert('Select a company'); return; }
+            window.location = '/Reports/DownloadAttendanceListPdf?companyId=' + companyId + '&departmentId=' + departmentId + '&fromDate=' + from + '&toDate=' + to;
+        });
+
+        $('#csvBtn').click(function () {
+            var companyId = $('#companySelect').val();
+            var departmentId = $('#departmentSelect').val() || '';
+            var from = $('#fromDate').val();
+            var to = $('#toDate').val();
+            if (!companyId) { alert('Select a company'); return; }
+            window.location = '/Reports/DownloadAttendanceListCsv?companyId=' + companyId + '&departmentId=' + departmentId + '&fromDate=' + from + '&toDate=' + to;
+        });
+
+        $('#excelBtn').click(function () {
+            var companyId = $('#companySelect').val();
+            var departmentId = $('#departmentSelect').val() || '';
+            var from = $('#fromDate').val();
+            var to = $('#toDate').val();
+            if (!companyId) { alert('Select a company'); return; }
+            window.location = '/Reports/DownloadAttendanceListExcel?companyId=' + companyId + '&departmentId=' + departmentId + '&fromDate=' + from + '&toDate=' + to;
+        });
+    });
+</script>
+}

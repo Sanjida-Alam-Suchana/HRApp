@@ -17,13 +17,17 @@ namespace HRApp.Controllers
         }
 
         // GET: Salaries/SalaryIndex
+        // SalaryIndex Action
         public async Task<IActionResult> SalaryIndex()
         {
             var companies = await _unitOfWork.Companies.GetAllAsync();
             ViewBag.Companies = companies;
 
             var selectedComId = Request.Cookies["SelectedComId"];
-            var salaries = await _unitOfWork.Salaries.GetAllAsync();
+            var salaries = await _unitOfWork.Salaries.GetQueryable()
+                .Include(s => s.Employee) // Ensure Employee is included
+                .Include(s => s.Company)  // Ensure Company is included
+                .ToListAsync();
 
             if (!string.IsNullOrEmpty(selectedComId))
             {
@@ -43,34 +47,27 @@ namespace HRApp.Controllers
         }
 
         // POST: Salaries/Calculate
+        // Calculate POST
         [HttpPost]
         [ValidateAntiForgeryToken]
-       
         public async Task<IActionResult> Calculate(Guid comId, int dtYear, int dtMonth)
         {
-            if (comId == Guid.Empty || dtYear <= 0 || dtMonth < 1 || dtMonth > 12)
+            try
             {
-                return Json(new { success = false, message = "Invalid parameters." });
+                await _unitOfWork.ExecRawAsync("CALL \"CalculateSalary\"({0}, {1}, {2})", comId, dtYear, dtMonth);
+                return Json(new { success = true, message = "Salary generated!" });
             }
-
-            // Call stored procedure via repository
-            await _unitOfWork.Salaries.ExecuteSqlRawAsync(
-                "CALL \"CalculateSalary\"({0}, {1}, {2})", comId, dtYear, dtMonth);
-
-            var salaries = await _unitOfWork.Salaries
-                .GetQueryable()
-                .Where(s => s.ComId == comId && s.dtYear == dtYear && s.dtMonth == dtMonth)
-                .ToListAsync();
-
-            return Json(new { success = true, message = "Salary calculated successfully!", data = salaries });
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
         }
-
 
         // GET: Salaries/SalaryCreate
         public async Task<IActionResult> SalaryCreate()
         {
             ViewBag.Companies = await _unitOfWork.Companies.GetAllAsync();
-            ViewBag.Employees = await _unitOfWork.Employees.GetAllAsync();
+            ViewBag.Employees = await _unitOfWork.Employees.GetAllAsync(); // Ensure this is populated
             return View();
         }
 
@@ -98,7 +95,7 @@ namespace HRApp.Controllers
             var salary = await _unitOfWork.Salaries.GetAsync(id);
             if (salary == null) return NotFound();
             ViewBag.Companies = await _unitOfWork.Companies.GetAllAsync();
-            ViewBag.Employees = await _unitOfWork.Employees.GetAllAsync();
+            ViewBag.Employees = await _unitOfWork.Employees.GetAllAsync(); // Ensure this is populated
             return View(salary);
         }
 
@@ -119,7 +116,7 @@ namespace HRApp.Controllers
             existingSalary.dtYear = salary.dtYear;
             existingSalary.dtMonth = salary.dtMonth;
             existingSalary.Basic = salary.Basic;
-            existingSalary.Hrent = salary.Hrent;
+            existingSalary.HRent = salary.HRent;
             existingSalary.Medical = salary.Medical;
             existingSalary.Gross = salary.Gross;
             existingSalary.AbsentDays = salary.AbsentDays;
@@ -144,5 +141,26 @@ namespace HRApp.Controllers
 
             return Json(new { success = true, message = "Salary deleted successfully!" });
         }
+        // POST: Salaries/Pay/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Pay(Guid id)
+        {
+            var salary = await _unitOfWork.Salaries.GetAsync(id);
+            if (salary == null)
+                return Json(new { success = false, message = "Salary not found." });
+
+            if (salary.IsPaid)
+                return Json(new { success = false, message = "Salary is already paid." });
+
+           
+            salary.IsPaid = true;
+            salary.PaidAmount = salary.PayableAmount;
+
+            await _unitOfWork.SaveAsync();
+
+            return Json(new { success = true, message = "Salary paid successfully!" });
+        }
+
     }
 }

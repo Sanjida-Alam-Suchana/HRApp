@@ -1,0 +1,25 @@
+﻿@model IEnumerable<object>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Employee Name</th>
+            <th>Total Present</th>
+            <th>Total Absent</th>
+            <th>Total Late</th>
+            <th>Total Absent</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (dynamic item in Model)
+        {
+            <tr>
+                <td>@item.EmployeeName</td>
+                <td>@item.TotalPresent</td>
+                <td>@item.TotalAbsent</td>
+                <td>@item.TotalLate</td>
+                <td>@item.TotalAbsentAgain</td>
+            </tr>
+        }
+    </tbody>
+</table>

@@ -43,7 +43,7 @@ namespace HRApp.Controllers
                     ComId = company.ComId,
                     ComName = company.ComName,
                     Basic = company.Basic,
-                    Hrent = company.Hrent,
+                    HRent = company.HRent,
                     Medical = company.Medical,
                     IsInactive = company.IsInactive
                 }
@@ -62,7 +62,7 @@ namespace HRApp.Controllers
 
             existingCompany.ComName = company.ComName;
             existingCompany.Basic = company.Basic;
-            existingCompany.Hrent = company.Hrent;
+            existingCompany.HRent = company.HRent;
             existingCompany.Medical = company.Medical;
             existingCompany.IsInactive = company.IsInactive;
 

@@ -59,27 +59,28 @@
             }
         });
 
-        $("#calculateForm").submit(function (e) {
-            e.preventDefault();
-            if ($(this).valid()) {
-                $.ajax({
-                    url: '/Salaries/Calculate',
-                    type: 'POST',
-                    data: $(this).serialize(),
-                    headers: {
-                        "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').val()
-                    },
-                    success: function (response) {
-                        alert(response.message);
-                        if (response.success) {
-                            window.location.href = '/Salaries/SalaryIndex';
-                        }
-                    },
-                    error: function (xhr) {
-                        alert("Failed to calculate salary: " + (xhr.responseJSON?.message || "Unknown error"));
-                    }
-                });
+      $("#calculateForm").submit(function (e) {
+    e.preventDefault();
+    if ($(this).valid()) {
+        $.ajax({
+            url: '/Salaries/Calculate',
+            type: 'POST',
+            data: $(this).serialize(),
+            headers: {
+                "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').val()
+            },
+            success: function (response) {
+                alert(response.message);
+                if (response.success) {
+                    $('#calculateModal').modal('hide');
+                    location.reload();
+                }
+            },
+            error: function (xhr) {
+                alert("Failed to calculate salary: " + (xhr.responseJSON?.message || "Unknown error"));
             }
         });
+    }
+});
     </script>
 }
