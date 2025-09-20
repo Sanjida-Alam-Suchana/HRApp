@@ -1,5 +1,4 @@
-﻿// EmployeesController.cs (Fixed Version)
-using HRApp.Models;
+﻿using HRApp.Models;
 using HRApp.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -168,48 +167,43 @@ namespace HRApp.Controllers
         {
             try
             {
-                if (id != employee.EmpId)
-                {
-                    return Json(new { success = false, message = "Invalid employee ID." });
-                }
+                Console.WriteLine($"Received Employee for Edit: EmpId={id}, EmpCode={employee.EmpCode}, EmpName={employee.EmpName}, ComId={employee.ComId}, ShiftId={employee.ShiftId}, DeptId={employee.DeptId}, DesigId={employee.DesigId}, Gross={employee.Gross}, DtJoin={employee.DtJoin}, HasImage={EmployeeImageFile != null}");
 
-                if (string.IsNullOrEmpty(employee.EmpCode) || string.IsNullOrEmpty(employee.EmpName) || employee.ComId == Guid.Empty || employee.ShiftId == Guid.Empty || employee.DeptId == Guid.Empty || employee.DesigId == Guid.Empty || employee.Gross <= 0 || employee.DtJoin == default)
-                {
-                    return Json(new { success = false, message = "All fields are required, and Gross must be greater than 0." });
-                }
-
-                var existing = await _unitOfWork.Employees.GetAllAsync();
-                if (existing.Any(e => e.EmpCode == employee.EmpCode && e.EmpId != id))
-                {
-                    return Json(new { success = false, message = "Employee code must be unique." });
-                }
-
+                // Fetch the existing employee
                 var existingEmployee = await _unitOfWork.Employees.GetAsync(id);
                 if (existingEmployee == null)
                 {
                     return Json(new { success = false, message = "Employee not found." });
                 }
 
-                // Validate related entities
-                var company = await _unitOfWork.Companies.GetAsync(employee.ComId);
-                if (company == null)
+                // Basic validation
+                if (string.IsNullOrEmpty(employee.EmpCode) ||
+                    string.IsNullOrEmpty(employee.EmpName) ||
+                    employee.ComId == Guid.Empty ||
+                    employee.Gross <= 0 ||
+                    employee.DtJoin == default)
                 {
-                    return Json(new { success = false, message = "Selected company does not exist." });
-                }
-                if (await _unitOfWork.Shifts.GetAsync(employee.ShiftId) == null)
-                {
-                    return Json(new { success = false, message = "Selected shift does not exist." });
-                }
-                if (await _unitOfWork.Departments.GetAsync(employee.DeptId) == null)
-                {
-                    return Json(new { success = false, message = "Selected department does not exist." });
-                }
-                if (await _unitOfWork.Designations.GetAsync(employee.DesigId) == null)
-                {
-                    return Json(new { success = false, message = "Selected designation does not exist." });
+                    return Json(new { success = false, message = "Required fields are missing." });
                 }
 
-                // Update fields
+                // Related entity validation
+                var company = await _unitOfWork.Companies.GetAsync(employee.ComId);
+                if (company == null)
+                    return Json(new { success = false, message = "Invalid company." });
+
+                if (employee.ShiftId != Guid.Empty && await _unitOfWork.Shifts.GetAsync(employee.ShiftId) == null)
+                    return Json(new { success = false, message = "Invalid shift." });
+
+                if (employee.DeptId != Guid.Empty && await _unitOfWork.Departments.GetAsync(employee.DeptId) == null)
+                    return Json(new { success = false, message = "Invalid department." });
+
+                if (employee.DesigId != Guid.Empty && await _unitOfWork.Designations.GetAsync(employee.DesigId) == null)
+                    return Json(new { success = false, message = "Invalid designation." });
+
+                if (!Enum.IsDefined(typeof(GenderType), employee.Gender))
+                    return Json(new { success = false, message = "Invalid gender." });
+
+                // Update employee fields
                 existingEmployee.EmpCode = employee.EmpCode;
                 existingEmployee.EmpName = employee.EmpName;
                 existingEmployee.ComId = employee.ComId;
@@ -220,27 +214,18 @@ namespace HRApp.Controllers
                 existingEmployee.Gross = employee.Gross;
                 existingEmployee.DtJoin = employee.DtJoin;
 
-                // Recalculate salary components
-                existingEmployee.Basic = existingEmployee.Gross * (company.Basic > 0 ? company.Basic : 0.5m);
-                existingEmployee.HRent = existingEmployee.Gross * (company.HRent > 0 ? company.HRent : 0.3m);
-                existingEmployee.Medical = existingEmployee.Gross * (company.Medical > 0 ? company.Medical : 0.15m);
-                existingEmployee.Others = existingEmployee.Gross * 0.05m;
+                // Salary components
+                existingEmployee.Basic = employee.Gross * (company.Basic > 0 ? company.Basic : 0.5m);
+                existingEmployee.HRent = employee.Gross * (company.HRent > 0 ? company.HRent : 0.3m);
+                existingEmployee.Medical = employee.Gross * (company.Medical > 0 ? company.Medical : 0.15m);
+                existingEmployee.Others = employee.Gross * 0.05m;
 
-                // Handle image upload if a new file is provided (replace old if exists)
+                // Image upload
                 if (EmployeeImageFile != null && EmployeeImageFile.Length > 0)
                 {
-                    // Optional: Delete old image if it exists
-                    if (!string.IsNullOrEmpty(existingEmployee.EmployeeImage))
-                    {
-                        var oldFilePath = Path.Combine(_environment.WebRootPath, existingEmployee.EmployeeImage.TrimStart('/'));
-                        if (System.IO.File.Exists(oldFilePath))
-                        {
-                            System.IO.File.Delete(oldFilePath);
-                        }
-                    }
-
                     var uploadsFolder = Path.Combine(_environment.WebRootPath, "images/employees");
-                    if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+                    if (!Directory.Exists(uploadsFolder))
+                        Directory.CreateDirectory(uploadsFolder);
 
                     var uniqueFileName = Guid.NewGuid().ToString() + "_" + EmployeeImageFile.FileName;
                     var filePath = Path.Combine(uploadsFolder, uniqueFileName);
@@ -250,12 +235,57 @@ namespace HRApp.Controllers
                         await EmployeeImageFile.CopyToAsync(fileStream);
                     }
 
+                    // Delete old image if it exists
+                    if (!string.IsNullOrEmpty(existingEmployee.EmployeeImage))
+                    {
+                        var oldImagePath = Path.Combine(_environment.WebRootPath, existingEmployee.EmployeeImage.TrimStart('/'));
+                        if (System.IO.File.Exists(oldImagePath))
+                        {
+                            System.IO.File.Delete(oldImagePath);
+                        }
+                    }
+
                     existingEmployee.EmployeeImage = "/images/employees/" + uniqueFileName;
                 }
-                // Else, keep the existing image (no change)
 
+                // Update the employee in the database
+                await _unitOfWork.Employees.UpdateAsync(existingEmployee);
                 await _unitOfWork.SaveAsync();
-                return Json(new { success = true, message = "Employee updated successfully!" });
+
+                // Include the updated employee in the response
+                var updatedEmployee = await _unitOfWork.Employees.GetAsync(id);
+                updatedEmployee.Company = await _unitOfWork.Companies.GetAsync(employee.ComId);
+                updatedEmployee.Shift = await _unitOfWork.Shifts.GetAsync(employee.ShiftId);
+                updatedEmployee.Department = await _unitOfWork.Departments.GetAsync(employee.DeptId);
+                updatedEmployee.Designation = await _unitOfWork.Designations.GetAsync(employee.DesigId);
+
+                return Json(new
+                {
+                    success = true,
+                    message = "Employee updated successfully!",
+                    employee = new
+                    {
+                        EmpId = updatedEmployee.EmpId,
+                        EmpCode = updatedEmployee.EmpCode,
+                        EmpName = updatedEmployee.EmpName,
+                        ComId = updatedEmployee.ComId,
+                        ShiftId = updatedEmployee.ShiftId,
+                        DeptId = updatedEmployee.DeptId,
+                        DesigId = updatedEmployee.DesigId,
+                        Gender = updatedEmployee.Gender,
+                        Gross = updatedEmployee.Gross,
+                        Basic = updatedEmployee.Basic,
+                        HRent = updatedEmployee.HRent,
+                        Medical = updatedEmployee.Medical,
+                        Others = updatedEmployee.Others,
+                        DtJoin = updatedEmployee.DtJoin,
+                        EmployeeImage = updatedEmployee.EmployeeImage,
+                        Company = new { ComName = updatedEmployee.Company?.ComName },
+                        Shift = new { ShiftName = updatedEmployee.Shift?.ShiftName },
+                        Department = new { DeptName = updatedEmployee.Department?.DeptName },
+                        Designation = new { DesigName = updatedEmployee.Designation?.DesigName }
+                    }
+                });
             }
             catch (Exception ex)
             {

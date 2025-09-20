@@ -93,8 +93,8 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-               <form id="createForm" method="post" action="@Url.Action("EmployeeCreate", "Employees")" enctype="multipart/form-data">
-                     @Html.AntiForgeryToken()
+                <form id="createForm" method="post" action="@Url.Action("EmployeeCreate", "Employees")" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
                     <div class="form-group mb-3">
                         <label for="createComId">Company</label>
                         <select id="createComId" name="ComId" class="form-control">
@@ -118,21 +118,21 @@
                     </div>
                     <div class="form-group mb-3">
                         <label for="createShiftId">Shift</label>
-                        <select id="createShiftId" name="ShiftId" class="form-control" >
+                        <select id="createShiftId" name="ShiftId" class="form-control">
                             <option value="">Select Shift</option>
                         </select>
                         <div id="createShiftId-error" class="text-danger"></div>
                     </div>
                     <div class="form-group mb-3">
                         <label for="createDeptId">Department</label>
-                        <select id="createDeptId" name="DeptId" class="form-control" >
+                        <select id="createDeptId" name="DeptId" class="form-control">
                             <option value="">Select Department</option>
                         </select>
                         <div id="createDeptId-error" class="text-danger"></div>
                     </div>
                     <div class="form-group mb-3">
                         <label for="createDesigId">Designation</label>
-                        <select id="createDesigId" name="DesigId" class="form-control" >
+                        <select id="createDesigId" name="DesigId" class="form-control">
                             <option value="">Select Designation</option>
                         </select>
                         <div id="createDesigId-error" class="text-danger"></div>
@@ -204,21 +204,21 @@
                     </div>
                     <div class="form-group mb-2">
                         <label for="editShiftId">Shift</label>
-                        <select id="editShiftId" name="ShiftId" class="form-control" >
+                        <select id="editShiftId" name="ShiftId" class="form-control">
                             <option value="">Select Shift</option>
                         </select>
                         <div id="editShiftId-error" class="text-danger"></div>
                     </div>
                     <div class="form-group mb-2">
                         <label for="editDeptId">Department</label>
-                        <select id="editDeptId" name="DeptId" class="form-control" >
+                        <select id="editDeptId" name="DeptId" class="form-control">
                             <option value="">Select Department</option>
                         </select>
                         <div id="editDeptId-error" class="text-danger"></div>
                     </div>
                     <div class="form-group mb-2">
                         <label for="editDesigId">Designation</label>
-                        <select id="editDesigId" name="DesigId" class="form-control" >
+                        <select id="editDesigId" name="DesigId" class="form-control">
                             <option value="">Select Designation</option>
                         </select>
                         <div id="editDesigId-error" class="text-danger"></div>
@@ -306,11 +306,16 @@
             }
         }
 
-        function loadFilteredDropdowns(comId, selectedShiftId, selectedDeptId, selectedDesigId) {
+        function loadFilteredDropdowns(comId, selectedShiftId, selectedDeptId, selectedDesigId, isEdit = false) {
+            const shiftSelect = isEdit ? $('#editShiftId') : $('#createShiftId');
+            const deptSelect = isEdit ? $('#editDeptId') : $('#createDeptId');
+            const desigSelect = isEdit ? $('#editDesigId') : $('#createDesigId');
+
             if (!comId) {
                 console.warn('No comId provided');
-                $('#createShiftId, #editShiftId, #createDeptId, #editDeptId, #createDesigId, #editDesigId')
-                    .empty().append('<option value="">No data available</option>').prop('disabled', true);
+                shiftSelect.empty().append('<option value="">Select a company first</option>').prop('disabled', true);
+                deptSelect.empty().append('<option value="">Select a company first</option>').prop('disabled', true);
+                desigSelect.empty().append('<option value="">Select a company first</option>').prop('disabled', true);
                 return Promise.resolve();
             }
 
@@ -318,7 +323,6 @@
                 $.getJSON(`/Employees/GetShiftsByCompany?comId=${comId}`)
                     .then(data => {
                         console.log('Shifts:', data);
-                        var shiftSelect = $('#createShiftId, #editShiftId');
                         shiftSelect.empty().append('<option value="">-- Select Shift --</option>');
                         if (data.length === 0) {
                             shiftSelect.append('<option value="">No shifts available</option>');
@@ -330,12 +334,12 @@
                     })
                     .fail((jqXHR, textStatus, error) => {
                         console.error('Error fetching shifts:', textStatus, error);
-                        $('#createShiftId, #editShiftId').empty().append('<option value="">Error loading shifts</option>').prop('disabled', true);
+                        shiftSelect.empty().append('<option value="">Error loading shifts</option>').prop('disabled', true);
+                        alert('Failed to load shifts: ' + error);
                     }),
                 $.getJSON(`/Employees/GetDeptsByCompany?comId=${comId}`)
                     .then(data => {
                         console.log('Departments:', data);
-                        var deptSelect = $('#createDeptId, #editDeptId');
                         deptSelect.empty().append('<option value="">-- Select Department --</option>');
                         if (data.length === 0) {
                             deptSelect.append('<option value="">No departments available</option>');
@@ -347,12 +351,12 @@
                     })
                     .fail((jqXHR, textStatus, error) => {
                         console.error('Error fetching departments:', textStatus, error);
-                        $('#createDeptId, #editDeptId').empty().append('<option value="">Error loading departments</option>').prop('disabled', true);
+                        deptSelect.empty().append('<option value="">Error loading departments</option>').prop('disabled', true);
+                        alert('Failed to load departments: ' + error);
                     }),
                 $.getJSON(`/Employees/GetDesignationsByCompany?comId=${comId}`)
                     .then(data => {
                         console.log('Designations:', data);
-                        var desigSelect = $('#createDesigId, #editDesigId');
                         desigSelect.empty().append('<option value="">-- Select Designation --</option>');
                         if (data.length === 0) {
                             desigSelect.append('<option value="">No designations available</option>');
@@ -364,7 +368,8 @@
                     })
                     .fail((jqXHR, textStatus, error) => {
                         console.error('Error fetching designations:', textStatus, error);
-                        $('#createDesigId, #editDesigId').empty().append('<option value="">Error loading designations</option>').prop('disabled', true);
+                        desigSelect.empty().append('<option value="">Error loading designations</option>').prop('disabled', true);
+                        alert('Failed to load designations: ' + error);
                     })
             ]);
         }
@@ -372,30 +377,40 @@
         $(document).ready(function () {
             console.log('Document ready - jQuery is loaded');
 
-            // Preselect company in create modal
             $('#createModal').on('shown.bs.modal', function () {
+                console.log('Create modal shown');
                 var selectedComId = getCookie("SelectedComId");
+                console.log('Cookie SelectedComId:', selectedComId);
                 if (selectedComId) {
                     $('#createComId').val(selectedComId).trigger('change');
+                } else {
+                    $('#createShiftId').empty().append('<option value="">Select a company first</option>').prop('disabled', true);
+                    $('#createDeptId').empty().append('<option value="">Select a company first</option>').prop('disabled', true);
+                    $('#createDesigId').empty().append('<option value="">Select a company first</option>').prop('disabled', true);
                 }
             });
 
-            $('#createComId, #editComId').change(function () {
+            $('#createComId').change(function () {
                 var comId = $(this).val();
-                console.log('Selected comId:', comId);
-                loadFilteredDropdowns(comId, null, null, null);
+                console.log('Selected comId (create):', comId);
+                loadFilteredDropdowns(comId, null, null, null, false);
             });
 
-            // Form validations
+            $('#editComId').change(function () {
+                var comId = $(this).val();
+                console.log('Selected comId (edit):', comId);
+                loadFilteredDropdowns(comId, null, null, null, true);
+            });
+
             function setupValidation(formId, prefix) {
                 $(formId).validate({
                     rules: {
                         ComId: { required: true },
                         EmpCode: { required: true },
                         EmpName: { required: true },
-                        ShiftId: { required: true },
-                        DeptId: { required: true },
-                        DesigId: { required: true },
+                        ShiftId: { required: false },
+                        DeptId: { required: false },
+                        DesigId: { required: false },
                         Gender: { required: true },
                         Gross: { required: true, number: true, min: 1 },
                         DtJoin: { required: true },
@@ -405,13 +420,13 @@
                         ComId: "Please select a company.",
                         EmpCode: "Please enter employee code.",
                         EmpName: "Please enter employee name.",
-                        ShiftId: "Please select shift.",
-                        DeptId: "Please select department.",
-                        DesigId: "Please select designation.",
+                        ShiftId: "Please select a shift.",
+                        DeptId: "Please select a department.",
+                        DesigId: "Please select a designation.",
                         Gender: "Please select gender.",
-                        Gross: "Enter valid gross salary.",
-                        DtJoin: "Enter join date.",
-                        EmployeeImageFile: "Upload valid image file."
+                        Gross: "Please enter a valid gross salary greater than 0.",
+                        DtJoin: "Please enter a join date.",
+                        EmployeeImageFile: "Please upload a valid image file (jpg, jpeg, png, gif)."
                     },
                     errorPlacement: function (error, element) {
                         error.appendTo("#" + prefix + element.attr("name") + "-error");
@@ -422,7 +437,6 @@
             setupValidation("#createForm", "create");
             setupValidation("#editForm", "edit");
 
-            // Create form submission
             $("#createForm").submit(function (e) {
                 console.log('Form submission intercepted');
                 e.preventDefault();
@@ -438,35 +452,36 @@
                         data: formData,
                         processData: false,
                         contentType: false,
-                    success: function (response) {
-    console.log("Create response:", response);
-    if (response.success) {
-        $('#createModal').modal('hide');
-        alert("Employee created successfully!"); 
-        let newRow = `
-            <tr id="row-${response.employee.empId}" data-empid="${response.employee.empId}" data-comid="${response.employee.comId}" data-empcode="${response.employee.empCode}" data-empname="${response.employee.empName}" data-shiftid="${response.employee.shiftId}" data-deptid="${response.employee.deptId}" data-desigid="${response.employee.desigId}" data-gender="${response.employee.gender}" data-gross="${response.employee.gross}" data-dtjoin="${response.employee.dtJoin}" data-basic="${response.employee.basic}" data-hrent="${response.employee.hRent}" data-medical="${response.employee.medical}" data-others="${response.employee.others}" data-employeeimage="${response.employee.employeeImage || ''}">
-                <td>${response.employee.empCode}</td>
-                <td>${response.employee.empName}</td>
-                <td>${response.employee.employeeImage ? `<img src="${response.employee.employeeImage}" alt="Employee Image" width="50" height="50" />` : 'No Image'}</td>
-                <td>${response.employee.company?.comName || 'N/A'}</td>
-                <td>${response.employee.shift?.shiftName || 'N/A'}</td>
-                <td>${response.employee.department?.deptName || 'N/A'}</td>
-                <td>${response.employee.designation?.desigName || 'N/A'}</td>
-                <td>${response.employee.gender === 1 ? 'Male' : response.employee.gender === 2 ? 'Female' : 'Other'}</td>
-                <td>${response.employee.gross}</td>
-                <td>${response.employee.basic}</td>
-                <td>${response.employee.hRent}</td>
-                <td>${response.employee.medical}</td>
-                <td>${response.employee.others}</td>
-                <td>${new Date(response.employee.dtJoin).toISOString().split('T')[0]}</td>
-                <td><button class="btn btn-warning btn-sm edit-btn">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteEmployee('${response.employee.empId}')">Delete</button></td>
-            </tr>`;
-        $('#employeeTable').append(newRow);
-        $("#createForm")[0].reset();
-    } else {
-        alert(response.message || "Failed to create employee.");
-    }
-},
+                        success: function (response) {
+                            console.log("Create response:", response);
+                            if (response.success) {
+                                $('#createModal').modal('hide');
+                                alert("Employee created successfully!");
+                                let newRow = `
+                                    <tr id="row-${response.employee.empId}" data-empid="${response.employee.empId}" data-comid="${response.employee.comId}" data-empcode="${response.employee.empCode}" data-empname="${response.employee.empName}" data-shiftid="${response.employee.shiftId}" data-deptid="${response.employee.deptId}" data-desigid="${response.employee.desigId}" data-gender="${response.employee.gender}" data-gross="${response.employee.gross}" data-dtjoin="${response.employee.dtJoin}" data-basic="${response.employee.basic}" data-hrent="${response.employee.hRent}" data-medical="${response.employee.medical}" data-others="${response.employee.others}" data-employeeimage="${response.employee.employeeImage || ''}">
+                                        <td>${response.employee.empCode}</td>
+                                        <td>${response.employee.empName}</td>
+                                        <td>${response.employee.employeeImage ? `<img src="${response.employee.employeeImage}" alt="Employee Image" width="50" height="50" />` : 'No Image'}</td>
+                                        <td>${response.employee.company?.comName || 'N/A'}</td>
+                                        <td>${response.employee.shift?.shiftName || 'N/A'}</td>
+                                        <td>${response.employee.department?.deptName || 'N/A'}</td>
+                                        <td>${response.employee.designation?.desigName || 'N/A'}</td>
+                                        <td>${response.employee.gender === 1 ? 'Male' : response.employee.gender === 2 ? 'Female' : 'Other'}</td>
+                                        <td>${response.employee.gross}</td>
+                                        <td>${response.employee.basic}</td>
+                                        <td>${response.employee.hRent}</td>
+                                        <td>${response.employee.medical}</td>
+                                        <td>${response.employee.others}</td>
+                                        <td>${new Date(response.employee.dtJoin).toISOString().split('T')[0]}</td>
+                                        <td><button class="btn btn-warning btn-sm edit-btn">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteEmployee('${response.employee.empId}')">Delete</button></td>
+                                    </tr>`;
+                                $('#employeeTable').append(newRow);
+                                $("#createForm")[0].reset();
+                                $('#createShiftId, #createDeptId, #createDesigId').empty().append('<option value="">Select a company first</option>').prop('disabled', true);
+                            } else {
+                                alert(response.message || "Failed to create employee.");
+                            }
+                        },
                         error: function (xhr, status, error) {
                             console.error("AJAX error:", xhr.responseText, status, error);
                             alert("Failed to create employee: " + (xhr.responseJSON?.message || "Unknown error"));
@@ -478,135 +493,115 @@
                 }
             });
 
-            // Edit form submit
-$("#editForm").submit(function (e) {
+           $("#editForm").submit(function (e) {
     e.preventDefault();
     console.log("Edit form submission started");
+
     if ($(this).valid()) {
-        var empId = $('#editEmpId').val();
-        console.log("Submitting edit for EmpId:", empId);
-        console.log("Form data:", {
-            ComId: $('#editComId').val(),
-            EmpCode: $('#editEmpCode').val(),
-            EmpName: $('#editEmpName').val(),
-            ShiftId: $('#editShiftId').val(),
-            DeptId: $('#editDeptId').val(),
-            DesigId: $('#editDesigId').val(),
-            Gender: $('#editGender').val(),
-            Gross: $('#editGross').val(),
-            DtJoin: $('#editDtJoin').val()
-        });
-        var formData = new FormData(this);
+        console.log("Form is valid, proceeding with AJAX");
+        let formData = new FormData(this);
+        for (let pair of formData.entries()) {
+            console.log(pair[0] + ': ' + pair[1]);
+        }
         formData.append("__RequestVerificationToken", $('input[name="__RequestVerificationToken"]').val());
+        let empId = $('#editEmpId').val();
+        console.log("Submitting edit for empId:", empId);
+        let $button = $(this).find("button[type=submit]");
+        $button.text("Updating...").prop("disabled", true);
+
         $.ajax({
-            url: '/Employees/EmployeeEdit/' + empId,
+           url: '@Url.Action("EmployeeEdit", "Employees")',
             type: 'POST',
             data: formData,
             processData: false,
             contentType: false,
             success: function (response) {
-                console.log("Edit success response:", response);
-                alert(response.message);
-                if (response.success) location.reload();
+                console.log("Edit response:", response);
+                if (response.success) {
+                    $('#editModal').modal('hide');
+                    alert(response.message);
+
+                    let row = $('#row-' + empId);
+                    row.data({
+                        empcode: response.employee.empCode,
+                        empname: response.employee.empName,
+                        comid: response.employee.comId,
+                        shiftid: response.employee.shiftId,
+                        deptid: response.employee.deptId,
+                        desigid: response.employee.desigId,
+                        gender: response.employee.gender,
+                        gross: response.employee.gross,
+                        dtjoin: response.employee.dtJoin,
+                        basic: response.employee.basic,
+                        hrent: response.employee.hRent,
+                        medical: response.employee.medical,
+                        others: response.employee.others,
+                        employeeimage: response.employee.employeeImage || ''
+                    });
+
+                    row.find('td:eq(0)').text(response.employee.empCode);
+                    row.find('td:eq(1)').text(response.employee.empName);
+                    row.find('td:eq(2)').html(response.employee.employeeImage 
+                        ? `<img src="${response.employee.employeeImage}" alt="Employee Image" width="50" height="50" />` 
+                        : 'No Image');
+                    row.find('td:eq(3)').text(response.employee.company?.comName || 'N/A');
+                    row.find('td:eq(4)').text(response.employee.shift?.shiftName || 'N/A');
+                    row.find('td:eq(5)').text(response.employee.department?.deptName || 'N/A');
+                    row.find('td:eq(6)').text(response.employee.designation?.desigName || 'N/A');
+                    row.find('td:eq(7)').text(
+                        response.employee.gender === 1 ? 'Male' :
+                        response.employee.gender === 2 ? 'Female' : 'Other'
+                    );
+                    row.find('td:eq(8)').text(response.employee.gross);
+                    row.find('td:eq(9)').text(response.employee.basic);
+                    row.find('td:eq(10)').text(response.employee.hRent);
+                    row.find('td:eq(11)').text(response.employee.medical);
+                    row.find('td:eq(12)').text(response.employee.others);
+                    row.find('td:eq(13)').text(new Date(response.employee.dtJoin).toISOString().split('T')[0]);
+                } else {
+                    console.log("Edit failed:", response.message);
+                    alert(response.message || "Failed to update employee.");
+                }
             },
             error: function (xhr, status, error) {
-                console.error("Edit error:", xhr.responseText, status, error);
-                alert("Failed: " + (xhr.responseJSON?.message || "Unknown error"));
+                console.error("AJAX error:", xhr.status, status, error, xhr.responseText);
+                alert("Failed to update employee: " + (xhr.responseJSON?.message || "Unknown error"));
+            },
+            complete: function () {
+                $button.text("Update").prop("disabled", false);
             }
         });
     } else {
         console.log("Form validation failed");
+        alert("Please fill all required fields correctly.");
     }
 });
 
-            // Edit button populate modal
-          $('.edit-btn').click(function () {
-    var row = $(this).closest('tr');
-    $('#editEmpId').val(row.data('empid'));
-    $('#editEmpCode').val(row.data('empcode'));
-    $('#editEmpName').val(row.data('empname'));
-    $('#editGender').val(row.data('gender'));
-    $('#editGross').val(row.data('gross'));
-    $('#editDtJoin').val(row.data('dtjoin'));
+            $(document).on('click', '.edit-btn', function () {
+                var row = $(this).closest('tr');
+                $('#editEmpId').val(row.data('empid'));
+                $('#editEmpCode').val(row.data('empcode'));
+                $('#editEmpName').val(row.data('empname'));
+                $('#editGender').val(row.data('gender'));
+                $('#editGross').val(row.data('gross'));
+                $('#editDtJoin').val(row.data('dtjoin'));
 
-    var employeeImage = row.data('employeeimage');
-    $('#currentImage').html(employeeImage ? `<img src="${employeeImage}" style="max-width:200px;" /><p>Current image (upload new to replace)</p>` : '<p>No current image</p>');
+                var employeeImage = row.data('employeeimage');
+                $('#currentImage').html(employeeImage ? `<img src="${employeeImage}" style="max-width:200px;" /><p>Current image (upload new to replace)</p>` : '<p>No current image</p>');
 
-    var comId = row.data('comid');
-    $('#editComId').val(comId).trigger('change');
+                var comId = row.data('comid');
+                $('#editComId').val(comId);
 
-    console.log("Loading dropdowns for ComId:", comId, "with values:", {
-        ShiftId: row.data('shiftid'),
-        DeptId: row.data('deptid'),
-        DesigId: row.data('desigid')
-    });
-
-    loadFilteredDropdowns(comId, row.data('shiftid'), row.data('deptid'), row.data('desigid')).then(() => {
-        $('#editModal').modal('show');
-    });
-});
+                loadFilteredDropdowns(
+                    comId, 
+                    row.data('shiftid'), 
+                    row.data('deptid'), 
+                    row.data('desigid'), 
+                    true
+                ).then(() => {
+                    $('#editModal').modal('show');
+                });
+            });
         });
-        function loadFilteredDropdowns(comId, selectedShiftId, selectedDeptId, selectedDesigId) {
-    if (!comId) {
-        console.warn('No comId provided');
-        $('#createShiftId, #editShiftId, #createDeptId, #editDeptId, #createDesigId, #editDesigId')
-            .empty().append('<option value="">No data available</option>').prop('disabled', true);
-        return Promise.resolve();
-    }
-
-    return Promise.all([
-        $.getJSON(`/Employees/GetShiftsByCompany?comId=${comId}`)
-            .then(data => {
-                console.log('Shifts loaded:', data);
-                var shiftSelect = $('#editShiftId'); // Only edit modal for this context
-                shiftSelect.empty().append('<option value="">-- Select Shift --</option>');
-                if (data.length === 0) {
-                    shiftSelect.append('<option value="">No shifts available</option>');
-                } else {
-                    data.forEach(s => shiftSelect.append(`<option value="${s.shiftId}">${s.shiftName || 'Unnamed'}</option>`));
-                }
-                if (selectedShiftId) shiftSelect.val(selectedShiftId);
-                shiftSelect.prop('disabled', data.length === 0);
-            })
-            .fail((jqXHR, textStatus, error) => {
-                console.error('Error fetching shifts:', textStatus, error);
-                $('#editShiftId').empty().append('<option value="">Error loading shifts</option>').prop('disabled', true);
-            }),
-        $.getJSON(`/Employees/GetDeptsByCompany?comId=${comId}`)
-            .then(data => {
-                console.log('Departments loaded:', data);
-                var deptSelect = $('#editDeptId');
-                deptSelect.empty().append('<option value="">-- Select Department --</option>');
-                if (data.length === 0) {
-                    deptSelect.append('<option value="">No departments available</option>');
-                } else {
-                    data.forEach(d => deptSelect.append(`<option value="${d.deptId}">${d.deptName || 'Unnamed'}</option>`));
-                }
-                if (selectedDeptId) deptSelect.val(selectedDeptId);
-                deptSelect.prop('disabled', data.length === 0);
-            })
-            .fail((jqXHR, textStatus, error) => {
-                console.error('Error fetching departments:', textStatus, error);
-                $('#editDeptId').empty().append('<option value="">Error loading departments</option>').prop('disabled', true);
-            }),
-        $.getJSON(`/Employees/GetDesignationsByCompany?comId=${comId}`)
-            .then(data => {
-                console.log('Designations loaded:', data);
-                var desigSelect = $('#editDesigId');
-                desigSelect.empty().append('<option value="">-- Select Designation --</option>');
-                if (data.length === 0) {
-                    desigSelect.append('<option value="">No designations available</option>');
-                } else {
-                    data.forEach(d => desigSelect.append(`<option value="${d.desigId}">${d.desigName || 'Unnamed'}</option>`));
-                }
-                if (selectedDesigId) desigSelect.val(selectedDesigId);
-                desigSelect.prop('disabled', data.length === 0);
-            })
-            .fail((jqXHR, textStatus, error) => {
-                console.error('Error fetching designations:', textStatus, error);
-                $('#editDesigId').empty().append('<option value="">Error loading designations</option>').prop('disabled', true);
-            })
-    ]);
-}
     </script>
 }
