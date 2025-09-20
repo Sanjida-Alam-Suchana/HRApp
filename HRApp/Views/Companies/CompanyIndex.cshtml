@@ -11,16 +11,16 @@
         @Html.AntiForgeryToken()
         <div class="row g-2">
             <div class="col">
-                <input type="text" class="form-control" name="ComName" placeholder="Company Name" required />
+                <input type="text" class="form-control" name="ComName" id="ComName" placeholder="Company Name" required />
             </div>
             <div class="col">
-                <input type="number" class="form-control" name="Basic" placeholder="Basic" required />
+                <input type="number" class="form-control" name="Basic" placeholder="Basic" required step="0.01" />
             </div>
             <div class="col">
-                <input type="number" class="form-control" name="HRent" placeholder="House Rent" required />
+                <input type="number" class="form-control" name="HRent" placeholder="House Rent" required step="0.01" />
             </div>
             <div class="col">
-                <input type="number" class="form-control" name="Medical" placeholder="Medical" required />
+                <input type="number" class="form-control" name="Medical" placeholder="Medical" required step="0.01" />
             </div>
             <div class="col">
                 <input type="hidden" name="IsInactive" value="false" />
@@ -72,50 +72,67 @@
             $("#createForm").submit(function (e) {
                 e.preventDefault();
 
-                const token = $('input[name="__RequestVerificationToken"]').val();
+                const comName = $("#ComName").val().trim();
+                const basic = parseFloat($("input[name='Basic']").val());
+                const hRent = parseFloat($("input[name='HRent']").val());
+                const medical = parseFloat($("input[name='Medical']").val());
+                const isInactive = $("input[name='IsInactive']").is(":checked");
 
+                console.log("Input Values:", { comName, basic, hRent, medical, isInactive });
+
+                if (!comName) {
+                    alert("Please enter a company name.");
+                    return;
+                }
+                if (isNaN(basic) || isNaN(hRent) || isNaN(medical)) {
+                    alert("Please enter valid numbers for Basic, House Rent, and Medical.");
+                    return;
+                }
+
+                const token = $('input[name="__RequestVerificationToken"]').val();
                 const data = {
                     __RequestVerificationToken: token,
-                    ComName: $("input[name='ComName']").val(),
-                    Basic: parseFloat($("input[name='Basic']").val()) || 0,
-                    HRent: parseFloat($("input[name='HRent']").val()) || 0,
-                    Medical: parseFloat($("input[name='Medical']").val()) || 0,
-                    IsInactive: $("input[name='IsInactive']").is(":checked")
+                    ComName: comName,
+                    Basic: basic,
+                    HRent: hRent,
+                    Medical: medical,
+                    IsInactive: isInactive
                 };
+
+                console.log("Form Data Sent:", data);
 
                 $.ajax({
                     url: '/Companies/CompanyCreate',
                     type: 'POST',
                     data: data,
                     success: function (response) {
-                        console.log("Response:", response); // Debug the response
-                        if (response.success) {
+                        console.log("Full Response:", response);
+                        console.log("Company Data:", response.company);
+
+                        if (response.success && response.company) {
                             const company = response.company;
-                            if (company) {
-                                $("#companyTable tbody").append(`
-                                    <tr id="row-${company.ComId}">
-                                        <td>${company.ComName || 'N/A'}</td>
-                                        <td>${company.Basic || 0}</td>
-                                        <td>${company.HRent || 0}</td>
-                                        <td>${company.Medical || 0}</td>
-                                        <td>${company.IsInactive ? 'Yes' : 'No'}</td>
-                                        <td>
-                                            <button class="btn btn-sm btn-warning editBtn" data-id="${company.ComId}">Edit</button>
-                                            <button class="btn btn-sm btn-danger deleteBtn" data-id="${company.ComId}">Delete</button>
-                                        </td>
-                                    </tr>
-                                `);
-                                $("#createForm")[0].reset();
-                                alert(response.message);
-                            } else {
-                                alert("Company data is missing in the response.");
-                            }
+                            $("#companyTable tbody").append(`
+                                <tr id="row-${company.ComId}">
+                                    <td>${company.ComName || ''}</td>
+                                    <td>${company.Basic ?? 0}</td>
+                                    <td>${company.HRent ?? 0}</td>
+                                    <td>${company.Medical ?? 0}</td>
+                                    <td>${company.IsInactive ? 'Yes' : 'No'}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-warning editBtn" data-id="${company.ComId}">Edit</button>
+                                        <button class="btn btn-sm btn-danger deleteBtn" data-id="${company.ComId}">Delete</button>
+                                    </td>
+                                </tr>
+                            `);
+                            $("#createForm")[0].reset();
+                            alert(response.message);
                         } else {
-                            alert(response.message || "Failed to create company.");
+                            console.error("Error: Invalid response", response);
+                            alert(response.message || "Failed to create company. Check console for details.");
                         }
                     },
                     error: function (xhr, status, error) {
-                        console.log("Error:", error, xhr.responseText);
+                        console.error("AJAX Error:", error, xhr.responseText);
                         alert("Something went wrong! Check console for details.");
                     }
                 });
@@ -124,18 +141,19 @@
             // DELETE
             $(document).on("click", ".deleteBtn", function () {
                 const id = $(this).data("id");
-                if (confirm("Are you sure?")) {
+                if (confirm("Are you sure you want to delete this company?")) {
                     $.post("/Companies/Delete/" + id, { __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val() }, function (res) {
-                        console.log("Delete Response:", res); // Debug
+                        console.log("Delete Response:", res);
                         alert(res.message);
                         if (res.success) $("#row-" + id).remove();
                     }).fail(function (xhr, status, error) {
-                        console.log("Delete Error:", error, xhr.responseText);
+                        console.error("Delete Error:", error, xhr.responseText);
+                        alert("Failed to delete company. Check console for details.");
                     });
                 }
             });
 
-            // EDIT via prompt (simple)
+            // EDIT via prompt
             $(document).on("click", ".editBtn", function () {
                 const id = $(this).data("id");
                 const row = $("#row-" + id);
@@ -145,37 +163,40 @@
                 const newMedical = prompt("Edit Medical:", row.find("td:eq(3)").text());
                 const newInactive = confirm("Mark as inactive?");
 
-                if (newName != null) {
-                    const data = {
-                        ComId: id,
-                        ComName: newName,
-                        Basic: parseFloat(newBasic) || 0,
-                        HRent: parseFloat(newHrent) || 0,
-                        Medical: parseFloat(newMedical) || 0,
-                        IsInactive: newInactive
-                    };
+                if (newName === null) return; // User canceled
 
-                    $.ajax({
-                        url: '/Companies/CompanyEdit/' + id,
-                        type: 'POST',
-                        data: data,
-                        headers: { "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').val() },
-                        success: function (res) {
-                            console.log("Edit Response:", res); // Debug
-                            alert(res.message);
-                            if (res.success) {
-                                row.find("td:eq(0)").text(data.ComName);
-                                row.find("td:eq(1)").text(data.Basic);
-                                row.find("td:eq(2)").text(data.HRent);
-                                row.find("td:eq(3)").text(data.Medical);
-                                row.find("td:eq(4)").text(data.IsInactive ? "Yes" : "No");
-                            }
-                        },
-                        error: function (xhr, status, error) {
-                            console.log("Edit Error:", error, xhr.responseText);
+                const data = {
+                    ComId: id,
+                    ComName: newName ? newName.trim() : '',
+                    Basic: parseFloat(newBasic) || 0,
+                    HRent: parseFloat(newHrent) || 0,
+                    Medical: parseFloat(newMedical) || 0,
+                    IsInactive: newInactive,
+                    __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val()
+                };
+
+                console.log("Edit Data Sent:", data);
+
+                $.ajax({
+                    url: '/Companies/CompanyEdit/' + id,
+                    type: 'POST',
+                    data: data,
+                    success: function (res) {
+                        console.log("Edit Response:", res);
+                        alert(res.message);
+                        if (res.success) {
+                            row.find("td:eq(0)").text(data.ComName);
+                            row.find("td:eq(1)").text(data.Basic);
+                            row.find("td:eq(2)").text(data.HRent);
+                            row.find("td:eq(3)").text(data.Medical);
+                            row.find("td:eq(4)").text(data.IsInactive ? "Yes" : "No");
                         }
-                    });
-                }
+                    },
+                    error: function (xhr, status, error) {
+                        console.error("Edit Error:", error, xhr.responseText);
+                        alert("Failed to edit company. Check console for details.");
+                    }
+                });
             });
         });
     </script>

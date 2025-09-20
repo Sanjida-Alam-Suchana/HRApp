@@ -66,6 +66,8 @@ namespace HRApp.Models
 
         [Column(TypeName = "decimal(18,2)")]
         public decimal Others { get; set; }
+        public string? EmployeeImage { get; set; }
+
 
         public virtual ICollection<Salary>? Salaries { get; set; }
         public virtual ICollection<Attendance>? Attendances { get; set; }

@@ -1,89 +1,151 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿// EmployeesController.cs (Fixed Version)
 using HRApp.Models;
 using HRApp.Repositories;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Hosting; // For IWebHostEnvironment
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore; 
+using System.IO; // For Path and File handling
 
 namespace HRApp.Controllers
 {
     public class EmployeesController : Controller
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IWebHostEnvironment _environment;
 
-        public EmployeesController(IUnitOfWork unitOfWork)
+        public EmployeesController(IUnitOfWork unitOfWork, IWebHostEnvironment environment)
         {
             _unitOfWork = unitOfWork;
+            _environment = environment;
         }
 
-        // GET: Employees/EmployeeIndex
         public async Task<IActionResult> EmployeeIndex()
         {
             var companies = await _unitOfWork.Companies.GetAllAsync();
             ViewBag.Companies = companies;
 
             var selectedComId = Request.Cookies["SelectedComId"];
-            var query = _unitOfWork.Employees.GetQueryable() // Use GetQueryable if available
+            var query = _unitOfWork.Employees.GetQueryable()
                 .Include(e => e.Company)
                 .Include(e => e.Shift)
                 .Include(e => e.Department)
                 .Include(e => e.Designation);
-            var allEmployees = await query.ToListAsync(); // Materialize after Include
+            var allEmployees = await query.ToListAsync();
+            Console.WriteLine($"Total employees: {allEmployees.Count}");
             var employees = string.IsNullOrEmpty(selectedComId)
                 ? allEmployees
                 : allEmployees.Where(e => e.ComId.ToString() == selectedComId).ToList();
-
+            Console.WriteLine($"Filtered employees: {employees.Count}, SelectedComId: {selectedComId}");
             return View(employees);
         }
-
         // POST: Employees/EmployeeCreate
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EmployeeCreate(Employee employee)
+        public async Task<IActionResult> EmployeeCreate(Employee employee, IFormFile? EmployeeImageFile)
         {
-            if (string.IsNullOrEmpty(employee.EmpCode) || string.IsNullOrEmpty(employee.EmpName) || employee.ComId == Guid.Empty || employee.ShiftId == Guid.Empty || employee.DeptId == Guid.Empty || employee.DesigId == Guid.Empty || employee.Gross <= 0 || employee.DtJoin == default)
+            try
             {
-                return Json(new { success = false, message = "All fields are required, and Gross must be greater than 0." });
-            }
+                Console.WriteLine($"Received Employee: EmpCode={employee.EmpCode}, EmpName={employee.EmpName}, ComId={employee.ComId}, ShiftId={employee.ShiftId}, DeptId={employee.DeptId}, DesigId={employee.DesigId}, Gross={employee.Gross}, DtJoin={employee.DtJoin}, HasImage={EmployeeImageFile != null}");
 
-            var existing = await _unitOfWork.Employees.GetAllAsync();
-            if (existing.Any(e => e.EmpCode == employee.EmpCode))
-            {
-                return Json(new { success = false, message = "Employee code must be unique." });
-            }
+                // Basic validation
+                if (string.IsNullOrEmpty(employee.EmpCode) ||
+                    string.IsNullOrEmpty(employee.EmpName) ||
+                    employee.ComId == Guid.Empty ||
+                    employee.Gross <= 0 ||
+                    employee.DtJoin == default)
+                {
+                    return Json(new { success = false, message = "Required fields are missing." });
+                }
 
-            // Validate related entities
-            var company = await _unitOfWork.Companies.GetAsync(employee.ComId);
-            if (company == null)
-            {
-                return Json(new { success = false, message = "Selected company does not exist." });
-            }
-            if (await _unitOfWork.Shifts.GetAsync(employee.ShiftId) == null)
-            {
-                return Json(new { success = false, message = "Selected shift does not exist." });
-            }
-            if (await _unitOfWork.Departments.GetAsync(employee.DeptId) == null)
-            {
-                return Json(new { success = false, message = "Selected department does not exist." });
-            }
-            if (await _unitOfWork.Designations.GetAsync(employee.DesigId) == null)
-            {
-                return Json(new { success = false, message = "Selected designation does not exist." });
-            }
+                // Related entity validation
+                var company = await _unitOfWork.Companies.GetAsync(employee.ComId);
+                if (company == null)
+                    return Json(new { success = false, message = "Invalid company." });
 
-            // Calculate salary components (assuming non-nullable decimal properties in Company)
-            employee.Basic = employee.Gross * (company.Basic > 0 ? company.Basic : 0.5m);
-            employee.HRent = employee.Gross * (company.HRent > 0 ? company.HRent : 0.3m);
-            employee.Medical = employee.Gross * (company.Medical > 0 ? company.Medical : 0.15m);
-            employee.Others = employee.Gross * 0.05m;
+                if (employee.ShiftId != Guid.Empty && await _unitOfWork.Shifts.GetAsync(employee.ShiftId) == null)
+                    return Json(new { success = false, message = "Invalid shift." });
 
-            employee.EmpId = Guid.NewGuid();
-            await _unitOfWork.Employees.AddAsync(employee);
-            await _unitOfWork.SaveAsync();
-            return Json(new { success = true, message = "Employee created successfully!" });
+                if (employee.DeptId != Guid.Empty && await _unitOfWork.Departments.GetAsync(employee.DeptId) == null)
+                    return Json(new { success = false, message = "Invalid department." });
+
+                if (employee.DesigId != Guid.Empty && await _unitOfWork.Designations.GetAsync(employee.DesigId) == null)
+                    return Json(new { success = false, message = "Invalid designation." });
+
+                if (!Enum.IsDefined(typeof(GenderType), employee.Gender))
+                    return Json(new { success = false, message = "Invalid gender." });
+
+                // Salary components
+                employee.Basic = employee.Gross * (company.Basic > 0 ? company.Basic : 0.5m);
+                employee.HRent = employee.Gross * (company.HRent > 0 ? company.HRent : 0.3m);
+                employee.Medical = employee.Gross * (company.Medical > 0 ? company.Medical : 0.15m);
+                employee.Others = employee.Gross * 0.05m;
+
+                // Image upload
+                if (EmployeeImageFile != null && EmployeeImageFile.Length > 0)
+                {
+                    var uploadsFolder = Path.Combine(_environment.WebRootPath, "images/employees");
+                    if (!Directory.Exists(uploadsFolder))
+                        Directory.CreateDirectory(uploadsFolder);
+
+                    var uniqueFileName = Guid.NewGuid().ToString() + "_" + EmployeeImageFile.FileName;
+                    var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                    using (var fileStream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await EmployeeImageFile.CopyToAsync(fileStream);
+                    }
+
+                    employee.EmployeeImage = "/images/employees/" + uniqueFileName;
+                }
+
+                employee.EmpId = Guid.NewGuid();
+                await _unitOfWork.Employees.AddAsync(employee);
+                await _unitOfWork.SaveAsync();
+
+                // Include the created employee in the response
+                var createdEmployee = await _unitOfWork.Employees.GetAsync(employee.EmpId);
+                createdEmployee.Company = await _unitOfWork.Companies.GetAsync(employee.ComId);
+                createdEmployee.Shift = await _unitOfWork.Shifts.GetAsync(employee.ShiftId);
+                createdEmployee.Department = await _unitOfWork.Departments.GetAsync(employee.DeptId);
+                createdEmployee.Designation = await _unitOfWork.Designations.GetAsync(employee.DesigId);
+
+                return Json(new
+                {
+                    success = true,
+                    message = "Employee created successfully!",
+                    employee = new
+                    {
+                        EmpId = createdEmployee.EmpId,
+                        EmpCode = createdEmployee.EmpCode,
+                        EmpName = createdEmployee.EmpName,
+                        ComId = createdEmployee.ComId,
+                        ShiftId = createdEmployee.ShiftId,
+                        DeptId = createdEmployee.DeptId,
+                        DesigId = createdEmployee.DesigId,
+                        Gender = createdEmployee.Gender,
+                        Gross = createdEmployee.Gross,
+                        Basic = createdEmployee.Basic,
+                        HRent = createdEmployee.HRent,
+                        Medical = createdEmployee.Medical,
+                        Others = createdEmployee.Others,
+                        DtJoin = createdEmployee.DtJoin,
+                        EmployeeImage = createdEmployee.EmployeeImage,
+                        Company = new { ComName = createdEmployee.Company?.ComName },
+                        Shift = new { ShiftName = createdEmployee.Shift?.ShiftName },
+                        Department = new { DeptName = createdEmployee.Department?.DeptName },
+                        Designation = new { DesigName = createdEmployee.Designation?.DesigName }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in EmployeeCreate: {ex.Message}\nStackTrace: {ex.StackTrace}");
+                return Json(new { success = false, message = $"Failed to create employee: {ex.Message}" });
+            }
         }
-
         // GET: Employees/EmployeeEdit/{id}
         public async Task<IActionResult> EmployeeEdit(Guid id)
         {
@@ -102,70 +164,105 @@ namespace HRApp.Controllers
         // POST: Employees/EmployeeEdit/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EmployeeEdit(Guid id, Employee employee)
+        public async Task<IActionResult> EmployeeEdit(Guid id, Employee employee, IFormFile? EmployeeImageFile)
         {
-            if (id != employee.EmpId)
+            try
             {
-                return Json(new { success = false, message = "Invalid employee ID." });
-            }
+                if (id != employee.EmpId)
+                {
+                    return Json(new { success = false, message = "Invalid employee ID." });
+                }
 
-            if (string.IsNullOrEmpty(employee.EmpCode) || string.IsNullOrEmpty(employee.EmpName) || employee.ComId == Guid.Empty || employee.ShiftId == Guid.Empty || employee.DeptId == Guid.Empty || employee.DesigId == Guid.Empty || employee.Gross <= 0 || employee.DtJoin == default)
-            {
-                return Json(new { success = false, message = "All fields are required, and Gross must be greater than 0." });
-            }
+                if (string.IsNullOrEmpty(employee.EmpCode) || string.IsNullOrEmpty(employee.EmpName) || employee.ComId == Guid.Empty || employee.ShiftId == Guid.Empty || employee.DeptId == Guid.Empty || employee.DesigId == Guid.Empty || employee.Gross <= 0 || employee.DtJoin == default)
+                {
+                    return Json(new { success = false, message = "All fields are required, and Gross must be greater than 0." });
+                }
 
-            var existing = await _unitOfWork.Employees.GetAllAsync();
-            if (existing.Any(e => e.EmpCode == employee.EmpCode && e.EmpId != id))
-            {
-                return Json(new { success = false, message = "Employee code must be unique." });
-            }
+                var existing = await _unitOfWork.Employees.GetAllAsync();
+                if (existing.Any(e => e.EmpCode == employee.EmpCode && e.EmpId != id))
+                {
+                    return Json(new { success = false, message = "Employee code must be unique." });
+                }
 
-            var existingEmployee = await _unitOfWork.Employees.GetAsync(id);
-            if (existingEmployee == null)
-            {
-                return Json(new { success = false, message = "Employee not found." });
-            }
+                var existingEmployee = await _unitOfWork.Employees.GetAsync(id);
+                if (existingEmployee == null)
+                {
+                    return Json(new { success = false, message = "Employee not found." });
+                }
 
-            // Validate related entities
-            var company = await _unitOfWork.Companies.GetAsync(employee.ComId);
-            if (company == null)
-            {
-                return Json(new { success = false, message = "Selected company does not exist." });
-            }
-            if (await _unitOfWork.Shifts.GetAsync(employee.ShiftId) == null)
-            {
-                return Json(new { success = false, message = "Selected shift does not exist." });
-            }
-            if (await _unitOfWork.Departments.GetAsync(employee.DeptId) == null)
-            {
-                return Json(new { success = false, message = "Selected department does not exist." });
-            }
-            if (await _unitOfWork.Designations.GetAsync(employee.DesigId) == null)
-            {
-                return Json(new { success = false, message = "Selected designation does not exist." });
-            }
+                // Validate related entities
+                var company = await _unitOfWork.Companies.GetAsync(employee.ComId);
+                if (company == null)
+                {
+                    return Json(new { success = false, message = "Selected company does not exist." });
+                }
+                if (await _unitOfWork.Shifts.GetAsync(employee.ShiftId) == null)
+                {
+                    return Json(new { success = false, message = "Selected shift does not exist." });
+                }
+                if (await _unitOfWork.Departments.GetAsync(employee.DeptId) == null)
+                {
+                    return Json(new { success = false, message = "Selected department does not exist." });
+                }
+                if (await _unitOfWork.Designations.GetAsync(employee.DesigId) == null)
+                {
+                    return Json(new { success = false, message = "Selected designation does not exist." });
+                }
 
-            // Update fields
-            existingEmployee.EmpCode = employee.EmpCode;
-            existingEmployee.EmpName = employee.EmpName;
-            existingEmployee.ComId = employee.ComId;
-            existingEmployee.ShiftId = employee.ShiftId;
-            existingEmployee.DeptId = employee.DeptId;
-            existingEmployee.DesigId = employee.DesigId;
-            existingEmployee.Gender = employee.Gender;
-            existingEmployee.Gross = employee.Gross;
-            existingEmployee.DtJoin = employee.DtJoin;
+                // Update fields
+                existingEmployee.EmpCode = employee.EmpCode;
+                existingEmployee.EmpName = employee.EmpName;
+                existingEmployee.ComId = employee.ComId;
+                existingEmployee.ShiftId = employee.ShiftId;
+                existingEmployee.DeptId = employee.DeptId;
+                existingEmployee.DesigId = employee.DesigId;
+                existingEmployee.Gender = employee.Gender;
+                existingEmployee.Gross = employee.Gross;
+                existingEmployee.DtJoin = employee.DtJoin;
 
-            // Recalculate salary components (assuming non-nullable decimal properties in Company)
-            existingEmployee.Basic = existingEmployee.Gross * (company.Basic > 0 ? company.Basic : 0.5m);
-            existingEmployee.HRent = existingEmployee.Gross * (company.HRent > 0 ? company.HRent : 0.3m);
-            existingEmployee.Medical = existingEmployee.Gross * (company.Medical > 0 ? company.Medical : 0.15m);
-            existingEmployee.Others = existingEmployee.Gross * 0.05m;
+                // Recalculate salary components
+                existingEmployee.Basic = existingEmployee.Gross * (company.Basic > 0 ? company.Basic : 0.5m);
+                existingEmployee.HRent = existingEmployee.Gross * (company.HRent > 0 ? company.HRent : 0.3m);
+                existingEmployee.Medical = existingEmployee.Gross * (company.Medical > 0 ? company.Medical : 0.15m);
+                existingEmployee.Others = existingEmployee.Gross * 0.05m;
 
-            await _unitOfWork.SaveAsync();
-            return Json(new { success = true, message = "Employee updated successfully!" });
+                // Handle image upload if a new file is provided (replace old if exists)
+                if (EmployeeImageFile != null && EmployeeImageFile.Length > 0)
+                {
+                    // Optional: Delete old image if it exists
+                    if (!string.IsNullOrEmpty(existingEmployee.EmployeeImage))
+                    {
+                        var oldFilePath = Path.Combine(_environment.WebRootPath, existingEmployee.EmployeeImage.TrimStart('/'));
+                        if (System.IO.File.Exists(oldFilePath))
+                        {
+                            System.IO.File.Delete(oldFilePath);
+                        }
+                    }
+
+                    var uploadsFolder = Path.Combine(_environment.WebRootPath, "images/employees");
+                    if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+
+                    var uniqueFileName = Guid.NewGuid().ToString() + "_" + EmployeeImageFile.FileName;
+                    var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                    using (var fileStream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await EmployeeImageFile.CopyToAsync(fileStream);
+                    }
+
+                    existingEmployee.EmployeeImage = "/images/employees/" + uniqueFileName;
+                }
+                // Else, keep the existing image (no change)
+
+                await _unitOfWork.SaveAsync();
+                return Json(new { success = true, message = "Employee updated successfully!" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in EmployeeEdit: {ex.Message}\nStackTrace: {ex.StackTrace}");
+                return Json(new { success = false, message = $"Failed to update employee: {ex.Message}" });
+            }
         }
-
         // POST: Employees/Delete
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -183,34 +280,43 @@ namespace HRApp.Controllers
             return Json(new { success = true, message = "Employee deleted successfully!" });
         }
 
-        // GET: Filter Shifts by Company (AJAX)
         [HttpGet]
         public async Task<IActionResult> GetShiftsByCompany(Guid comId)
         {
+            Console.WriteLine($"GetShiftsByCompany called with comId: {comId}");
             var shifts = await _unitOfWork.Shifts.GetAllAsync();
-            var filtered = shifts.Where(s => s.ComId == comId)
-                .Select(s => new { ShiftId = s.ShiftId.ToString(), ShiftName = s.ShiftName });
-            return Json(filtered.ToList());
+            var filtered = shifts
+                .Where(s => s.ComId == comId)
+                .Select(s => new { s.ShiftId, ShiftName = s.ShiftName ?? "Unnamed Shift" })
+                .ToList();
+            Console.WriteLine($"Shifts found: {filtered.Count}");
+            return Json(filtered);
         }
 
-        // GET: Filter Departments by Company (AJAX)
         [HttpGet]
         public async Task<IActionResult> GetDeptsByCompany(Guid comId)
         {
+            Console.WriteLine($"GetDeptsByCompany called with comId: {comId}");
             var depts = await _unitOfWork.Departments.GetAllAsync();
-            var filtered = depts.Where(d => d.ComId == comId)
-                .Select(d => new { DeptId = d.DeptId.ToString(), DeptName = d.DeptName });
-            return Json(filtered.ToList());
+            var filtered = depts
+                .Where(d => d.ComId == comId)
+                .Select(d => new { d.DeptId, DeptName = d.DeptName ?? "Unnamed Department" })
+                .ToList();
+            Console.WriteLine($"Departments found: {filtered.Count}");
+            return Json(filtered);
         }
 
-        // GET: Filter Designations by Company (AJAX)
         [HttpGet]
         public async Task<IActionResult> GetDesignationsByCompany(Guid comId)
         {
-            var designations = await _unitOfWork.Designations.GetAllAsync();
-            var filtered = designations.Where(d => d.ComId == comId)
-                .Select(d => new { DesigId = d.DesigId.ToString(), DesigName = d.DesigName });
-            return Json(filtered.ToList());
+            Console.WriteLine($"GetDesignationsByCompany called with comId: {comId}");
+            var desigs = await _unitOfWork.Designations.GetAllAsync();
+            var filtered = desigs
+                .Where(d => d.ComId == comId)
+                .Select(d => new { d.DesigId, DesigName = d.DesigName ?? "Unnamed Designation" })
+                .ToList();
+            Console.WriteLine($"Designations found: {filtered.Count}");
+            return Json(filtered);
         }
     }
 }

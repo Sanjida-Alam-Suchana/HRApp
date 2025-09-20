@@ -1,75 +1,37 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using HRApp.Data;
+﻿using HRApp.Data;
 using HRApp.Models;
 using HRApp.Repositories;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OfficeOpenXml;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace HRApp.Controllers
 {
     public class AttendancesController : Controller
     {
         private readonly IUnitOfWork _unitOfWork;
-        private readonly ApplicationDbContext _context;
 
-        public AttendancesController(IUnitOfWork unitOfWork, ApplicationDbContext context)
+        public AttendancesController(IUnitOfWork unitOfWork)
         {
             _unitOfWork = unitOfWork;
-            _context = context ?? throw new ArgumentNullException(nameof(context));
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AttendanceSummaryGenerate(Guid? comId, string summaryMonth)
-        {
-            if (comId is null) return BadRequest("Company not selected.");
-            if (string.IsNullOrEmpty(summaryMonth)) return BadRequest("Month not selected.");
-
-            var date = DateTime.ParseExact(summaryMonth, "yyyy-MM", null);
-            int year = date.Year;
-            int month = date.Month;
-
-            await _unitOfWork.ExecRawAsync("CALL CalculateAttendanceSummary({0}, {1}, {2})", comId.Value, year, month);
-            return Ok(new { ok = true });
-        }
-
-        // POST: Salaries/Calculate
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Calculate(Guid comId, int dtYear, int dtMonth)
-        {
-            if (comId == Guid.Empty || dtYear <= 0 || dtMonth < 1 || dtMonth > 12)
-            {
-                return Json(new { success = false, message = "Invalid parameters." });
-            }
-
-            try
-            {
-                await _unitOfWork.ExecRawAsync("CALL \"CalculateSalary\"({0}, {1}, {2})", comId, dtYear, dtMonth);
-                var salaries = await _unitOfWork.Salaries
-                    .GetQueryable()
-                    .Where(s => s.ComId == comId && s.dtYear == dtYear && s.dtMonth == dtMonth)
-                    .Include(s => s.Employee)
-                    .ToListAsync();
-                return Json(new { success = true, message = "Salary calculated successfully!", data = salaries });
-            }
-            catch (Exception ex)
-            {
-                return Json(new { success = false, message = $"Error: {ex.Message}" });
-            }
         }
 
         public async Task<IActionResult> AttendanceIndex()
         {
             var companies = await _unitOfWork.Companies.GetAllAsync();
             ViewBag.Companies = companies;
-            ViewBag.Employees = await _unitOfWork.Employees.GetAllAsync(); // Ensure this is set
+            ViewBag.Employees = await _unitOfWork.Employees.GetAllAsync();
 
             var selectedComId = Request.Cookies["SelectedComId"];
 
-            var query = _context.Attendances
+            // Use 'var' and AsQueryable() to avoid type conflicts
+            var query = _unitOfWork.Attendances.GetQueryable()
                 .Include(a => a.Employee)
                 .Include(a => a.Company)
                 .AsQueryable();
@@ -83,48 +45,29 @@ namespace HRApp.Controllers
             return View(attendances);
         }
 
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AttendanceCreate(Attendance attendance)
         {
-            if (attendance.EmpId == Guid.Empty)
-            {
-                return Json(new { success = false, message = "Please select an employee." });
-            }
+            if (attendance.EmpId == Guid.Empty || attendance.ComId == Guid.Empty)
+                return Json(new { success = false, message = "Employee and Company are required." });
 
-            if (attendance.ComId == Guid.Empty)
-            {
-                return Json(new { success = false, message = "Please select a company." });
-            }
+            var employee = await _unitOfWork.Employees.GetQueryable()
+                .Include(e => e.Company)
+                .Include(e => e.Shift)
+                .FirstOrDefaultAsync(e => e.EmpId == attendance.EmpId);
 
-            if (attendance.InTime == default || attendance.OutTime == default)
-            {
-                return Json(new { success = false, message = "In time and out time are required." });
-            }
-
-            var employee = await _unitOfWork.Employees.GetAsync(attendance.EmpId);
-            if (employee != null && employee.Shift != null)
-            {
-                var startTime = employee.Shift.StartTime;
-                attendance.AttStatus = attendance.InTime > startTime ? "L" : "P";
-            }
-            else
-            {
-                attendance.AttStatus = "P";
-            }
+            if (employee == null) return Json(new { success = false, message = "Employee not found." });
 
             attendance.Id = Guid.NewGuid();
+            attendance.AttStatus = (employee.Shift != null && attendance.InTime > employee.Shift.StartTime) ? "L" : "P";
+            attendance.Employee = employee;
+            attendance.Company = employee.Company;
+
             await _unitOfWork.Attendances.AddAsync(attendance);
-            try
-            {
-                await _unitOfWork.SaveAsync();
-                System.Diagnostics.Debug.WriteLine($"Attendance created with ID: {attendance.Id}, ComId: {attendance.ComId}"); // Log for debug
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Save error: {ex.Message}"); // Log error
-                return Json(new { success = false, message = $"Failed to save attendance: {ex.Message}" });
-            }
+            await _unitOfWork.SaveAsync();
+
             return Json(new { success = true, message = "Attendance created!", id = attendance.Id.ToString(), attStatus = attendance.AttStatus });
         }
 
@@ -132,62 +75,32 @@ namespace HRApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AttendanceEdit(Guid id, Attendance attendance)
         {
-            if (id != attendance.Id)
-            {
-                return Json(new { success = false, message = "Invalid attendance ID." });
-            }
+            var existing = await _unitOfWork.Attendances.GetQueryable()
+                .Include(a => a.Employee)
+                .Include(a => a.Company)
+                .FirstOrDefaultAsync(a => a.Id == id);
 
-            if (string.IsNullOrEmpty(attendance.AttStatus))
-            {
-                return Json(new { success = false, message = "Attendance status is required." });
-            }
+            if (existing == null) return Json(new { success = false, message = "Attendance not found." });
 
-            if (attendance.EmpId == Guid.Empty)
-            {
-                return Json(new { success = false, message = "Please select an employee." });
-            }
+            var employee = await _unitOfWork.Employees.GetQueryable()
+                .Include(e => e.Company)
+                .Include(e => e.Shift)
+                .FirstOrDefaultAsync(e => e.EmpId == attendance.EmpId);
 
-            if (attendance.ComId == Guid.Empty)
-            {
-                return Json(new { success = false, message = "Please select a company." });
-            }
+            if (employee == null) return Json(new { success = false, message = "Employee not found." });
 
-            if (attendance.InTime == default || attendance.OutTime == default)
-            {
-                return Json(new { success = false, message = "In time and out time are required." });
-            }
+            existing.EmpId = attendance.EmpId;
+            existing.ComId = employee.ComId;
+            existing.dtDate = attendance.dtDate;
+            existing.InTime = attendance.InTime;
+            existing.OutTime = attendance.OutTime;
+            existing.AttStatus = (employee.Shift != null && attendance.InTime > employee.Shift.StartTime) ? "L" : "P";
+            existing.Employee = employee;
+            existing.Company = employee.Company;
 
-            var employee = await _unitOfWork.Employees.GetAsync(attendance.EmpId);
-            if (employee != null && employee.Shift != null)
-            {
-                var startTime = employee.Shift.StartTime;
-                attendance.AttStatus = attendance.InTime > startTime ? "L" : "P";
-            }
+            await _unitOfWork.SaveAsync();
 
-            var existingAttendance = await _unitOfWork.Attendances.GetAsync(id);
-            if (existingAttendance == null)
-            {
-                return Json(new { success = false, message = "Attendance not found." });
-            }
-
-            existingAttendance.dtDate = attendance.dtDate;
-            existingAttendance.AttStatus = attendance.AttStatus;
-            existingAttendance.InTime = attendance.InTime;
-            existingAttendance.OutTime = attendance.OutTime;
-            existingAttendance.EmpId = attendance.EmpId;
-            existingAttendance.ComId = attendance.ComId;
-
-            try
-            {
-                await _unitOfWork.SaveAsync();
-                System.Diagnostics.Debug.WriteLine($"Attendance updated with ID: {id}, ComId: {attendance.ComId}"); // Log for debug
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Update error: {ex.Message}"); // Log error
-                return Json(new { success = false, message = $"Failed to update attendance: {ex.Message}" });
-            }
-            return Json(new { success = true, message = "Attendance updated!", attStatus = attendance.AttStatus });
+            return Json(new { success = true, message = "Attendance updated!", attStatus = existing.AttStatus });
         }
 
         [HttpPost]
@@ -195,23 +108,202 @@ namespace HRApp.Controllers
         public async Task<IActionResult> Delete(Guid id)
         {
             var attendance = await _unitOfWork.Attendances.GetAsync(id);
-            if (attendance == null)
-            {
-                return Json(new { success = false, message = "Attendance not found." });
-            }
+            if (attendance == null) return Json(new { success = false, message = "Attendance not found." });
 
             await _unitOfWork.Attendances.DeleteAsync(id);
+            await _unitOfWork.SaveAsync();
+
+            return Json(new { success = true, message = "Attendance deleted!" });
+        }
+
+        // Bulk attendance model
+        public class BulkAttendanceModel
+        {
+            public string EmpId { get; set; }
+            public string ComId { get; set; }
+            public string dtDate { get; set; }
+            public string InTime { get; set; }
+            public string OutTime { get; set; }
+            public string AttStatus { get; set; }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> BulkCreate([FromBody] List<BulkAttendanceModel> attendances)
+        {
+            if (attendances == null || !attendances.Any())
+                return Json(new { success = false, message = "No attendance data provided." });
+
+            int addedCount = 0;
+            var errors = new List<string>();
+
+            foreach (var item in attendances)
+            {
+                try
+                {
+                    var employee = await _unitOfWork.Employees.GetAsync(Guid.Parse(item.EmpId));
+                    if (employee == null)
+                    {
+                        errors.Add($"Employee not found: {item.EmpId}");
+                        continue;
+                    }
+
+                    var attDate = DateOnly.Parse(item.dtDate);
+                    var existing = await _unitOfWork.Attendances.GetQueryable()
+                        .FirstOrDefaultAsync(a => a.EmpId == employee.EmpId && a.dtDate == attDate);
+
+                    if (existing != null)
+                    {
+                        errors.Add($"Attendance already exists for {employee.EmpName} on {attDate}");
+                        continue;
+                    }
+
+                    var attendance = new Attendance
+                    {
+                        Id = Guid.NewGuid(),
+                        EmpId = employee.EmpId,
+                        ComId = Guid.Parse(item.ComId),
+                        dtDate = attDate,
+                        InTime = TimeOnly.Parse(item.InTime),
+                        OutTime = TimeOnly.Parse(item.OutTime),
+                        AttStatus = item.AttStatus,
+                        Employee = employee,
+                        Company = employee.Company
+                    };
+
+                    await _unitOfWork.Attendances.AddAsync(attendance);
+                    addedCount++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Error for EmpId {item.EmpId}: {ex.Message}");
+                }
+            }
+
             try
             {
                 await _unitOfWork.SaveAsync();
-                System.Diagnostics.Debug.WriteLine($"Attendance deleted with ID: {id}"); // Log for debug
+                return Json(new { success = true, message = $"Bulk attendance saved! {addedCount} records.", errors });
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Delete error: {ex.Message}"); // Log error
-                return Json(new { success = false, message = $"Failed to delete attendance: {ex.Message}" });
+                return Json(new { success = false, message = $"Error saving records: {ex.Message}" });
             }
-            return Json(new { success = true, message = "Attendance deleted!" });
+        }
+        public async Task<IActionResult> DownloadBulkAttendance(Guid comId, DateTime date)
+        {
+            var attendances = await _unitOfWork.Attendances.GetQueryable()
+                .Include(a => a.Employee)
+                .Include(a => a.Company)
+                .Where(a => a.ComId == comId && a.dtDate == DateOnly.FromDateTime(date))
+                .ToListAsync();
+
+            using var package = new ExcelPackage();
+            var ws = package.Workbook.Worksheets.Add("Attendance");
+            ws.Cells[1, 1].Value = "Employee";
+            ws.Cells[1, 2].Value = "Date";
+            ws.Cells[1, 3].Value = "In Time";
+            ws.Cells[1, 4].Value = "Out Time";
+            ws.Cells[1, 5].Value = "Status";
+
+            int row = 2;
+            foreach (var att in attendances)
+            {
+                ws.Cells[row, 1].Value = att.Employee.EmpName;
+                ws.Cells[row, 2].Value = att.dtDate.ToString("yyyy-MM-dd");
+                ws.Cells[row, 3].Value = att.InTime.ToString("HH:mm");
+                ws.Cells[row, 4].Value = att.OutTime.ToString("HH:mm");
+                ws.Cells[row, 5].Value = att.AttStatus;
+                row++;
+            }
+
+            var stream = new MemoryStream(package.GetAsByteArray());
+            return File(stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "BulkAttendance.xlsx");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> UploadExcel(IFormFile file)
+        {
+            if (file == null || file.Length == 0) return Json(new { success = false, message = "No file selected." });
+
+            var errors = new List<string>();
+            int addedCount = 0;
+
+            using var stream = new MemoryStream();
+            await file.CopyToAsync(stream);
+            stream.Position = 0;
+
+            using var package = new ExcelPackage(stream);
+            var worksheet = package.Workbook.Worksheets[0];
+            int rowCount = worksheet.Dimension.Rows;
+
+            for (int row = 2; row <= rowCount; row++)
+            {
+                try
+                {
+                    string empCode = worksheet.Cells[row, 1].Text?.Trim();
+                    string dateStr = worksheet.Cells[row, 2].Text?.Trim();
+                    string inTimeStr = worksheet.Cells[row, 3].Text?.Trim();
+                    string outTimeStr = worksheet.Cells[row, 4].Text?.Trim();
+
+                    if (string.IsNullOrEmpty(empCode) || string.IsNullOrEmpty(dateStr))
+                    {
+                        errors.Add($"Row {row}: Missing employee code or date.");
+                        continue;
+                    }
+
+                    if (!DateTime.TryParse(dateStr, out DateTime date) ||
+                        !TimeSpan.TryParse(inTimeStr, out TimeSpan inTime) ||
+                        !TimeSpan.TryParse(outTimeStr, out TimeSpan outTime))
+                    {
+                        errors.Add($"Row {row}: Invalid date/time format.");
+                        continue;
+                    }
+
+                    var employee = await _unitOfWork.Employees.GetQueryable()
+                        .Include(e => e.Company)
+                        .Include(e => e.Shift)
+                        .FirstOrDefaultAsync(e => e.EmpCode == empCode);
+
+                    if (employee == null)
+                    {
+                        errors.Add($"Row {row}: Employee not found.");
+                        continue;
+                    }
+
+                    var existingAttendance = await _unitOfWork.Attendances.GetQueryable()
+                        .FirstOrDefaultAsync(a => a.EmpId == employee.EmpId && a.dtDate == DateOnly.FromDateTime(date));
+
+                    if (existingAttendance != null)
+                    {
+                        errors.Add($"Row {row}: Attendance already exists for {empCode} on {date:yyyy-MM-dd}.");
+                        continue;
+                    }
+
+                    var attendance = new Attendance
+                    {
+                        Id = Guid.NewGuid(),
+                        EmpId = employee.EmpId,
+                        ComId = employee.ComId,
+                        dtDate = DateOnly.FromDateTime(date),
+                        InTime = TimeOnly.FromTimeSpan(inTime),
+                        OutTime = TimeOnly.FromTimeSpan(outTime),
+                        AttStatus = (employee.Shift != null && TimeOnly.FromTimeSpan(inTime) > employee.Shift.StartTime) ? "L" : "P",
+                        Employee = employee,
+                        Company = employee.Company
+                    };
+
+                    await _unitOfWork.Attendances.AddAsync(attendance);
+                    addedCount++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Row {row}: {ex.Message}");
+                }
+            }
+
+            await _unitOfWork.SaveAsync();
+
+            return Json(new { success = true, message = $"Excel upload completed! {addedCount} records added.", errors });
         }
     }
 }

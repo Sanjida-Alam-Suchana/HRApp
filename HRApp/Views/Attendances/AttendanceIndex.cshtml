@@ -2,16 +2,16 @@
 @using HRApp.Models
 @{
     ViewData["Title"] = "Attendance List";
-    var companies = ViewBag.Companies as List<Company>;
-    var employees = ViewBag.Employees as List<Employee>;
+    var companies = ViewBag.Companies as List<Company> ?? new List<Company>();
+    var employees = ViewBag.Employees as List<Employee> ?? new List<Employee>();
 }
 
 <div class="container mt-4">
     <h2>Attendance List</h2>
 
-    <!-- Create Form -->
+    <!-- Single Attendance Form -->
     <div class="card mb-4 p-3">
-        <h4>Create New Attendance</h4>
+        <h4>Create New Attendance (Single)</h4>
         <form id="createAttendanceForm">
             @Html.AntiForgeryToken()
             <div class="form-group mb-3">
@@ -58,7 +58,60 @@
         </form>
     </div>
 
-    <!-- Company Dropdown -->
+    <!-- Bulk Attendance Form -->
+    <div class="card mb-4 p-3">
+        <h4>Bulk Attendance Entry</h4>
+        <form id="bulkAttendanceForm">
+            @Html.AntiForgeryToken()
+            <div class="form-group mb-3">
+                <label for="bulkComId">Company</label>
+                <select id="bulkComId" name="ComId" class="form-control" required>
+                    <option value="">Select Company</option>
+                    @foreach (var company in companies)
+                    {
+                        <option value="@company.ComId">@company.ComName</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group mb-3">
+                <label for="bulkDtDate">Date</label>
+                <input type="date" id="bulkDtDate" name="dtDate" class="form-control" required />
+            </div>
+
+            <table class="table table-bordered" id="bulkEmployeeTable">
+                <thead>
+                    <tr>
+                        <th>Select</th>
+                        <th>Employee</th>
+                        <th>In Time</th>
+                        <th>Out Time</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var employee in employees)
+                    {
+                        <tr data-comid="@employee.ComId">
+                            <td><input type="checkbox" name="EmpIds" value="@employee.EmpId" /></td>
+                            <td>@employee.EmpName</td>
+                            <td><input type="time" name="InTimes" class="form-control" /></td>
+                            <td><input type="time" name="OutTimes" class="form-control" /></td>
+                            <td>
+                                <select name="AttStatuses" class="form-control">
+                                    <option value="P">Present</option>
+                                    <option value="L">Late</option>
+                                    <option value="A">Absent</option>
+                                </select>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <button type="submit" class="btn btn-success">Save Bulk Attendance</button>
+        </form>
+    </div>
+
+    <!-- Company Dropdown Filter -->
     <select id="companyDropdown" class="form-select mb-3" onchange="setCompany(this.value)">
         <option value="">Select Company</option>
         @foreach (var company in companies)
@@ -132,6 +185,7 @@
         </div>
     </div>
 
+    <!-- Attendance List Table -->
     <table class="table table-bordered">
         <thead>
             <tr>
@@ -168,193 +222,88 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         $(document).ready(function () {
-            // Update AttStatus based on InTime and Shift StartTime
-            function updateAttStatus(inTimeField, attStatusField, empIdField) {
-                var inTime = $(inTimeField).val();
-                var empId = $(empIdField).val();
-                var shiftStartTime = $(empIdField + " option:selected").data("shift-starttime");
-                
-                if (inTime && shiftStartTime) {
-                    var inTimeDate = new Date("1970-01-01T" + inTime + ":00");
-                    var startTimeDate = new Date("1970-01-01T" + shiftStartTime + ":00");
-                    if (inTimeDate > startTimeDate) {
-                        $(attStatusField).val("L"); // Late
-                    } else {
-                        $(attStatusField).val("P"); // Present
-                    }
-                } else {
-                    $(attStatusField).val("P"); // Default to Present if no shift
-                }
-            }
+          // === Single Attendance Employee Filter ===
+$("#ComId").change(function () {
+    var comId = $(this).val();
+    $("#EmpId option").each(function () {
+        var empComId = $(this).data("comid");
+        if (comId === "" || empComId == comId) {
+            $(this).show();
+        } else {
+            $(this).hide();
+        }
+    });
+    $("#EmpId").val(""); // Reset employee selection
+});
 
-            // Filter employees based on selected company (Create Form)
-            $("#ComId").change(function () {
-                var comId = $(this).val();
-                $("#EmpId option").each(function () {
-                    var empComId = $(this).data("comid");
-                    $(this).toggle(comId === "" || empComId === comId);
-                });
-                $("#EmpId").val(""); // Reset employee selection
-                updateAttStatus("#InTime", "#AttStatus", "#EmpId");
-            });
+// === Edit Modal Employee Filter ===
+$("#editComId").change(function () {
+    var comId = $(this).val();
+    $("#editEmpId option").each(function () {
+        var empComId = $(this).data("comid");
+        if (comId === "" || empComId == comId) {
+            $(this).show();
+        } else {
+            $(this).hide();
+        }
+    });
+    $("#editEmpId").val(""); // Reset employee selection
+});
+$("#bulkEmployeeTable tbody tr").hide(); // hide all initially
 
-            // Filter employees based on selected company (Edit Form)
-            $("#editComId").change(function () {
-                var comId = $(this).val();
-                $("#editEmpId option").each(function () {
-                    var empComId = $(this).data("comid");
-                    $(this).toggle(comId === "" || empComId === comId);
-                });
-                $("#editEmpId").val(""); // Reset employee selection
-                updateAttStatus("#editInTime", "#editAttStatus", "#editEmpId");
-            });
+$("#bulkComId").change(function () {
+    var comId = $(this).val();
+    $("#bulkEmployeeTable tbody tr").each(function () {
+        var empComId = $(this).data("comid");
+        $(this).toggle(comId === "" || empComId === comId);
+    });
+});
 
-            // Update AttStatus on EmpId or InTime change (Create Form)
-            $("#EmpId, #InTime").change(function () {
-                updateAttStatus("#InTime", "#AttStatus", "#EmpId");
-            });
-
-            // Update AttStatus on EmpId or InTime change (Edit Form)
-            $("#editEmpId, #editInTime").change(function () {
-                updateAttStatus("#editInTime", "#editAttStatus", "#editEmpId");
-            });
-
-            // Create Attendance
-            $("#createAttendanceForm").submit(function (e) {
-                e.preventDefault();
-                $.ajax({
-                    url: '/Attendances/AttendanceCreate',
-                    type: 'POST',
-                    data: $(this).serialize(),
-                    headers: {
-                        "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val()
-                    },
-                    success: function (response) {
-                        alert(response.message);
-                        if (response.success) {
-                            var comId = $("#ComId").val();
-                            document.cookie = "SelectedComId=" + comId + "; path=/";
-                            var employeeName = $("#EmpId option:selected").text();
-                            var newRow = `
-                                <tr id="row-${response.id}" data-comid="${comId}" data-empid="${$("#EmpId").val()}" data-dtdate="${$("#dtDate").val()}" data-intime="${$("#InTime").val()}" data-outtime="${$("#OutTime").val()}" data-attstatus="${response.attStatus}">
-                                    <td>${$("#dtDate").val()}</td>
-                                    <td>${employeeName}</td>
-                                    <td>${response.attStatus}</td>
-                                    <td>${$("#InTime").val()}</td>
-                                    <td>${$("#OutTime").val()}</td>
-                                    <td>
-                                        <button class="btn btn-warning btn-sm" onclick="openEditModal('${response.id}')">Edit</button>
-                                        <button class="btn btn-danger btn-sm" onclick="deleteAttendance('${response.id}')">Delete</button>
-                                    </td>
-                                </tr>`;
-                            $("#attendanceTable").append(newRow);
-                            $("#createAttendanceForm")[0].reset();
-                            $("#companyDropdown").val(comId);
-                            setCompany(comId); // Apply filter
-                        }
-                    },
-                    error: function (xhr) {
-                        alert("Failed: " + (xhr.responseJSON?.message || "Unknown error"));
+   $("#bulkAttendanceForm").submit(function (e) {
+                e.preventDefault();  // Prevent normal form submission
+                var selectedEmployees = [];
+                $("#bulkEmployeeTable tbody tr").each(function () {
+                    var checkbox = $(this).find("input[type=checkbox]");
+                    if (checkbox.is(":checked")) {
+                        selectedEmployees.push({
+                            EmpId: checkbox.val(),
+                            InTime: $(this).find("input[name='InTimes']").val(),
+                            OutTime: $(this).find("input[name='OutTimes']").val(),
+                            AttStatus: $(this).find("select[name='AttStatuses']").val(),
+                            dtDate: $("#bulkDtDate").val(),
+                            ComId: $("#bulkComId").val()
+                        });
                     }
                 });
+
+    if (selectedEmployees.length === 0) { alert("Please select at least one employee."); return; }
+
+    $.ajax({
+        url: '/Attendances/BulkCreate', // your existing bulk save action
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(selectedEmployees),
+        headers: { "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
+        success: function (response) {
+            alert(response.message);
+
+            if(response.success) {
+                // Trigger download after saving
+                var comId = $("#bulkComId").val();
+                var dtDate = $("#bulkDtDate").val();
+                window.location.href = `/Attendances/DownloadBulkAttendance?comId=${comId}&dtDate=${dtDate}`;
+            }
+        },
+        error: function () { alert("Bulk attendance failed."); }
+    });
+});
+
+
+        function setCompany(comId) {
+            $("#attendanceTable tr").each(function () {
+                var rowComId = $(this).data("comid");
+                $(this).toggle(comId === "" || rowComId === comId);
             });
-
-            // Open Edit Modal
-            window.openEditModal = function (id) {
-                var row = $("#row-" + id);
-                $("#editId").val(id);
-                $("#editComId").val(row.data("comid"));
-                $("#editComId").trigger("change"); // Trigger company filter
-                $("#editEmpId").val(row.data("empid"));
-                $("#editDtDate").val(row.data("dtdate"));
-                $("#editInTime").val(row.data("intime"));
-                $("#editOutTime").val(row.data("outtime"));
-                $("#editAttStatus").val(row.data("attstatus"));
-                updateAttStatus("#editInTime", "#editAttStatus", "#editEmpId"); // Update status
-                $("#editAttendanceModal").modal("show");
-            };
-
-            // Edit Attendance
-            $("#editAttendanceForm").submit(function (e) {
-                e.preventDefault();
-                var id = $("#editId").val();
-                $.ajax({
-                    url: '/Attendances/AttendanceEdit/' + id,
-                    type: 'POST',
-                    data: $(this).serialize(),
-                    headers: {
-                        "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val()
-                    },
-                    success: function (response) {
-                        alert(response.message);
-                        if (response.success) {
-                            var comId = $("#editComId").val();
-                            document.cookie = "SelectedComId=" + comId + "; path=/";
-                            var row = $("#row-" + id);
-                            var employeeName = $("#editEmpId option:selected").text();
-                            row.data("comid", comId);
-                            row.data("empid", $("#editEmpId").val());
-                            row.data("dtdate", $("#editDtDate").val());
-                            row.data("intime", $("#editInTime").val());
-                            row.data("outtime", $("#editOutTime").val());
-                            row.data("attstatus", response.attStatus);
-                            row.find("td:eq(0)").text($("#editDtDate").val());
-                            row.find("td:eq(1)").text(employeeName);
-                            row.find("td:eq(2)").text(response.attStatus);
-                            row.find("td:eq(3)").text($("#editInTime").val());
-                            row.find("td:eq(4)").text($("#editOutTime").val());
-                            $("#editAttendanceModal").modal("hide");
-                            $("#companyDropdown").val(comId);
-                            setCompany(comId); // Apply filter
-                        }
-                    },
-                    error: function (xhr) {
-                        alert("Failed: " + (xhr.responseJSON?.message || "Unknown error"));
-                    }
-                });
-            });
-
-            // Set company dropdown from cookie
-            var selectedComId = getCookie("SelectedComId");
-            if (selectedComId) {
-                $("#companyDropdown").val(selectedComId);
-                setCompany(selectedComId);
-            }
-
-            function getCookie(name) {
-                let match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-                return match ? match[2] : null;
-            }
-
-            // Filter table based on company
-            function setCompany(comId) {
-                $("#attendanceTable tr").each(function () {
-                    var rowComId = $(this).data("comid");
-                    $(this).toggle(comId === "" || rowComId === comId);
-                });
-            }
-
-            // Delete Attendance
-            window.deleteAttendance = function (id) {
-                if (confirm("Are you sure you want to delete this attendance?")) {
-                    $.ajax({
-                        url: '/Attendances/Delete/' + id,
-                        type: 'POST',
-                        headers: {
-                            "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val()
-                        },
-                        success: function (response) {
-                            alert(response.message);
-                            if (response.success) {
-                                $('#row-' + id).remove();
-                            }
-                        },
-                        error: function () {
-                            alert("Failed to delete attendance.");
-                        }
-                    });
-                }
-            };
-        });
+        }
     </script>
 }
