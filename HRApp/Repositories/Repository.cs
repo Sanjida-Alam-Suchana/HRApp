@@ -91,6 +91,11 @@ namespace HRApp.Repositories
         {
             return await _context.Set<T>().FindAsync(id);
         }
+        public async Task AddRangeAsync(IEnumerable<T> entities)
+        {
+            await _dbSet.AddRangeAsync(entities);
+        }
+
 
 
     }

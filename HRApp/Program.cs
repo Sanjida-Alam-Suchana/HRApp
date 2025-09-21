@@ -3,6 +3,7 @@ using HRApp.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Rotativa.AspNetCore;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.

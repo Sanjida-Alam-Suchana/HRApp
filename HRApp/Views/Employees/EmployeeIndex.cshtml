@@ -1,20 +1,20 @@
 ﻿@model IEnumerable<HRApp.Models.Employee>
 @using HRApp.Models
 @{
-    ViewData["Title"] = "Employee List";
-    var companies = ViewBag.Companies as List<Company>;
+    var companies = ViewBag.Companies as List<Company> ?? new List<Company>();
 }
 
-<div class="container mt-4">
-    <h2>Employee List</h2>
+<div class="container">
+    <h2>Employees</h2>
 
+    <!-- Company Dropdown -->
     <div class="form-group mb-3">
-        <label for="companyDropdown">Filter by Company</label>
-        <select id="companyDropdown" class="form-control" onchange="setCompany(this.value)">
+        <label for="companyFilter">Filter by Company</label>
+        <select id="companyFilter" class="form-select" onchange="setCompany(this.value)">
             <option value="">All Companies</option>
-            @foreach (var company in companies ?? new List<Company>())
+            @foreach (var company in companies)
             {
-                <option value="@company.ComId">@company.ComName</option>
+                <option value="@company.ComId" selected="@(company.ComId.ToString() == (ViewBag.SelectedComId?.ToString() ?? "") ? "selected" : null)">@company.ComName</option>
             }
         </select>
     </div>
@@ -23,10 +23,10 @@
 
     @Html.AntiForgeryToken()
 
-    <table class="table table-bordered">
+    <table id="employeeTable" class="table table-bordered">
         <thead>
             <tr>
-                <th>Employee Code</th>
+                <th>Code</th>
                 <th>Name</th>
                 <th>Image</th>
                 <th>Company</th>
@@ -34,236 +34,249 @@
                 <th>Department</th>
                 <th>Designation</th>
                 <th>Gender</th>
-                <th>Gross Salary</th>
+                <th>Gross</th>
                 <th>Basic</th>
                 <th>HRent</th>
                 <th>Medical</th>
                 <th>Others</th>
                 <th>Join Date</th>
-                <th>Actions</th>
+                <th>Action</th>
             </tr>
         </thead>
-        <tbody id="employeeTable">
-            @foreach (var item in Model)
+        <tbody>
+            @foreach (var emp in Model)
             {
-                var companyName = item.Company?.ComName ?? "N/A";
-                var shiftName = item.Shift?.ShiftName ?? "N/A";
-                var deptName = item.Department?.DeptName ?? "N/A";
-                var desigName = item.Designation?.DesigName ?? "N/A";
-                <tr id="row-@item.EmpId" data-empid="@item.EmpId" data-comid="@item.ComId" data-empcode="@item.EmpCode" data-empname="@item.EmpName" data-shiftid="@item.ShiftId" data-deptid="@item.DeptId" data-desigid="@item.DesigId" data-gender="@((int)item.Gender)" data-gross="@item.Gross" data-dtjoin="@item.DtJoin.ToString("yyyy-MM-dd")" data-basic="@item.Basic" data-hrent="@item.HRent" data-medical="@item.Medical" data-others="@item.Others" data-employeeimage="@item.EmployeeImage">
-                    <td>@item.EmpCode</td>
-                    <td>@item.EmpName</td>
+                <tr id="row-@emp.EmpId"
+                    data-empid="@emp.EmpId"
+                    data-comid="@emp.ComId"
+                    data-empcode="@emp.EmpCode"
+                    data-empname="@emp.EmpName"
+                    data-shiftid="@emp.ShiftId"
+                    data-deptid="@emp.DeptId"
+                    data-desigid="@emp.DesigId"
+                    data-gender="@((int)emp.Gender)"
+                    data-gross="@emp.Gross"
+                    data-basic="@emp.Basic"
+                    data-hrent="@emp.HRent"
+                    data-medical="@emp.Medical"
+                    data-others="@emp.Others"
+                    data-dtjoin="@emp.DtJoin.ToString("yyyy-MM-dd")"
+                    data-employeeimage="@emp.EmployeeImage">
+                    <td>@emp.EmpCode</td>
+                    <td>@emp.EmpName</td>
                     <td>
-                        @if (!string.IsNullOrEmpty(item.EmployeeImage))
+                        @if (!string.IsNullOrEmpty(emp.EmployeeImage))
                         {
-                            <img src="@item.EmployeeImage" alt="Employee Image" width="50" height="50" />
+                            <img src="@emp.EmployeeImage" width="50" height="50" alt="Employee Image" />
                         }
                         else
                         {
                             <span>No Image</span>
                         }
                     </td>
-                    <td>@companyName</td>
-                    <td>@shiftName</td>
-                    <td>@deptName</td>
-                    <td>@desigName</td>
-                    <td>@item.Gender</td>
-                    <td>@item.Gross</td>
-                    <td>@item.Basic</td>
-                    <td>@item.HRent</td>
-                    <td>@item.Medical</td>
-                    <td>@item.Others</td>
-                    <td>@item.DtJoin.ToString("yyyy-MM-dd")</td>
+                    <td>@(emp.Company?.ComName ?? "N/A")</td>
+                    <td>@(emp.Shift?.ShiftName ?? "N/A")</td>
+                    <td>@(emp.Department?.DeptName ?? "N/A")</td>
+                    <td>@(emp.Designation?.DesigName ?? "N/A")</td>
+                    <td>@(emp.Gender == GenderType.Male ? "Male" : emp.Gender == GenderType.Female ? "Female" : "Other")</td>
+                    <td>@emp.Gross</td>
+                    <td>@emp.Basic</td>
+                    <td>@emp.HRent</td>
+                    <td>@emp.Medical</td>
+                    <td>@emp.Others</td>
+                    <td>@emp.DtJoin.ToString("yyyy-MM-dd")</td>
                     <td>
-                        <button class="btn btn-warning btn-sm edit-btn">Edit</button>
-                        <button class="btn btn-danger btn-sm" onclick="deleteEmployee('@item.EmpId')">Delete</button>
+                        <button class="btn btn-sm btn-warning edit-btn">Edit</button>
+                        <button class="btn btn-sm btn-danger delete-btn" onclick="deleteEmployee('@emp.EmpId')">Delete</button>
                     </td>
                 </tr>
             }
         </tbody>
     </table>
-</div>
 
-<!-- Create Modal -->
-<div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="createModalLabel">Create Employee</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="createForm" method="post" action="@Url.Action("EmployeeCreate", "Employees")" enctype="multipart/form-data">
-                    @Html.AntiForgeryToken()
-                    <div class="form-group mb-3">
-                        <label for="createComId">Company</label>
-                        <select id="createComId" name="ComId" class="form-control">
-                            <option value="">Select Company</option>
-                            @foreach (var company in companies ?? new List<Company>())
-                            {
-                                <option value="@company.ComId">@company.ComName</option>
-                            }
-                        </select>
-                        <div id="createComId-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label for="createEmpCode">Employee Code</label>
-                        <input type="text" class="form-control" id="createEmpCode" name="EmpCode" />
-                        <div id="createEmpCode-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label for="createEmpName">Employee Name</label>
-                        <input type="text" class="form-control" id="createEmpName" name="EmpName" />
-                        <div id="createEmpName-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label for="createShiftId">Shift</label>
-                        <select id="createShiftId" name="ShiftId" class="form-control">
-                            <option value="">Select Shift</option>
-                        </select>
-                        <div id="createShiftId-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label for="createDeptId">Department</label>
-                        <select id="createDeptId" name="DeptId" class="form-control">
-                            <option value="">Select Department</option>
-                        </select>
-                        <div id="createDeptId-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label for="createDesigId">Designation</label>
-                        <select id="createDesigId" name="DesigId" class="form-control">
-                            <option value="">Select Designation</option>
-                        </select>
-                        <div id="createDesigId-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label for="createGender">Gender</label>
-                        <select id="createGender" name="Gender" class="form-control">
-                            <option value="">Select Gender</option>
-                            <option value="1">Male</option>
-                            <option value="2">Female</option>
-                            <option value="3">Other</option>
-                        </select>
-                        <div id="createGender-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label for="createGross">Gross Salary</label>
-                        <input type="number" class="form-control" id="createGross" name="Gross" step="0.01" />
-                        <div id="createGross-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label for="createDtJoin">Join Date</label>
-                        <input type="date" class="form-control" id="createDtJoin" name="DtJoin" value="@DateTime.Today.ToString("yyyy-MM-dd")" />
-                        <div id="createDtJoin-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label for="createEmployeeImageFile">Employee Image</label>
-                        <input type="file" class="form-control" id="createEmployeeImageFile" name="EmployeeImageFile" accept="image/*" />
-                        <div id="createEmployeeImageFile-error" class="text-danger"></div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Create</button>
-                </form>
+    <!-- Create Modal -->
+    <div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createModalLabel">Create Employee</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createForm" method="post" action="@Url.Action("EmployeeCreate", "Employees")" enctype="multipart/form-data">
+                        @Html.AntiForgeryToken()
+                        <div class="form-group mb-3">
+                            <label for="createComId">Company</label>
+                            <select id="createComId" name="ComId" class="form-control">
+                                <option value="">Select Company</option>
+                                @foreach (var company in companies)
+                                {
+                                    <option value="@company.ComId">@company.ComName</option>
+                                }
+                            </select>
+                            <div id="createComId-error" class="text-danger"></div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="createEmpCode">Employee Code</label>
+                            <input type="text" class="form-control" id="createEmpCode" name="EmpCode" />
+                            <div id="createEmpCode-error" class="text-danger"></div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="createEmpName">Employee Name</label>
+                            <input type="text" class="form-control" id="createEmpName" name="EmpName" />
+                            <div id="createEmpName-error" class="text-danger"></div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="createShiftId">Shift</label>
+                            <select id="createShiftId" name="ShiftId" class="form-control">
+                                <option value="">Select Shift</option>
+                            </select>
+                            <div id="createShiftId-error" class="text-danger"></div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="createDeptId">Department</label>
+                            <select id="createDeptId" name="DeptId" class="form-control">
+                                <option value="">Select Department</option>
+                            </select>
+                            <div id="createDeptId-error" class="text-danger"></div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="createDesigId">Designation</label>
+                            <select id="createDesigId" name="DesigId" class="form-control">
+                                <option value="">Select Designation</option>
+                            </select>
+                            <div id="createDesigId-error" class="text-danger"></div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="createGender">Gender</label>
+                            <select id="createGender" name="Gender" class="form-control">
+                                <option value="">Select Gender</option>
+                                <option value="1">Male</option>
+                                <option value="2">Female</option>
+                                <option value="3">Other</option>
+                            </select>
+                            <div id="createGender-error" class="text-danger"></div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="createGross">Gross Salary</label>
+                            <input type="number" class="form-control" id="createGross" name="Gross" step="0.01" />
+                            <div id="createGross-error" class="text-danger"></div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="createDtJoin">Join Date</label>
+                            <input type="date" class="form-control" id="createDtJoin" name="DtJoin" value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                            <div id="createDtJoin-error" class="text-danger"></div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="createEmployeeImageFile">Employee Image</label>
+                            <input type="file" class="form-control" id="createEmployeeImageFile" name="EmployeeImageFile" accept="image/*" />
+                            <div id="createEmployeeImageFile-error" class="text-danger"></div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Edit Modal -->
-<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="editModalLabel">Edit Employee</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="editForm" enctype="multipart/form-data">
+    <!-- Edit Employee Modal -->
+    <div class="modal fade" id="editEmployeeModal" tabindex="-1" aria-labelledby="editEmployeeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form id="editEmployeeForm" enctype="multipart/form-data">
                     @Html.AntiForgeryToken()
                     <input type="hidden" id="editEmpId" name="EmpId" />
-                    <div class="form-group mb-3">
-                        <label for="editComId">Company</label>
-                        <select id="editComId" name="ComId" class="form-control">
-                            <option value="">Select Company</option>
-                            @foreach (var company in companies ?? new List<Company>())
-                            {
-                                <option value="@company.ComId">@company.ComName</option>
-                            }
-                        </select>
-                        <div id="editComId-error" class="text-danger"></div>
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editEmployeeModalLabel">Edit Employee</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="form-group mb-2">
-                        <label for="editEmpCode">Employee Code</label>
-                        <input type="text" class="form-control" id="editEmpCode" name="EmpCode" />
-                        <div id="editEmpCode-error" class="text-danger"></div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="editEmpCode" class="form-label">Employee Code</label>
+                            <input type="text" class="form-control" id="editEmpCode" name="EmpCode" />
+                            <div id="editEmpCode-error" class="text-danger"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editEmpName" class="form-label">Employee Name</label>
+                            <input type="text" class="form-control" id="editEmpName" name="EmpName" />
+                            <div id="editEmpName-error" class="text-danger"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editGross" class="form-label">Gross Salary</label>
+                            <input type="number" class="form-control" id="editGross" name="Gross" step="0.01" />
+                            <div id="editGross-error" class="text-danger"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editDtJoin" class="form-label">Join Date</label>
+                            <input type="date" class="form-control" id="editDtJoin" name="DtJoin" />
+                            <div id="editDtJoin-error" class="text-danger"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editGender" class="form-label">Gender</label>
+                            <select class="form-select" id="editGender" name="Gender">
+                                <option value="1">Male</option>
+                                <option value="2">Female</option>
+                                <option value="3">Other</option>
+                            </select>
+                            <div id="editGender-error" class="text-danger"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editCompany" class="form-label">Company</label>
+                            <select class="form-select" id="editCompany" name="ComId">
+                                <option value="">Select Company</option>
+                                @foreach (var company in companies)
+                                {
+                                    <option value="@company.ComId">@company.ComName</option>
+                                }
+                            </select>
+                            <div id="editComId-error" class="text-danger"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editShift" class="form-label">Shift</label>
+                            <select class="form-select" id="editShift" name="ShiftId">
+                                <option value="">Select Shift</option>
+                            </select>
+                            <div id="editShiftId-error" class="text-danger"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editDept" class="form-label">Department</label>
+                            <select class="form-select" id="editDept" name="DeptId">
+                                <option value="">Select Department</option>
+                            </select>
+                            <div id="editDeptId-error" class="text-danger"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editDesig" class="form-label">Designation</label>
+                            <select class="form-select" id="editDesig" name="DesigId">
+                                <option value="">Select Designation</option>
+                            </select>
+                            <div id="editDesigId-error" class="text-danger"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Current Image</label>
+                            <div id="currentImage"></div>
+                            <input type="file" class="form-control" id="editEmployeeImage" name="EmployeeImageFile" accept="image/*" />
+                            <div id="editEmployeeImageFile-error" class="text-danger"></div>
+                        </div>
                     </div>
-                    <div class="form-group mb-2">
-                        <label for="editEmpName">Employee Name</label>
-                        <input type="text" class="form-control" id="editEmpName" name="EmpName" />
-                        <div id="editEmpName-error" class="text-danger"></div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
                     </div>
-                    <div class="form-group mb-2">
-                        <label for="editShiftId">Shift</label>
-                        <select id="editShiftId" name="ShiftId" class="form-control">
-                            <option value="">Select Shift</option>
-                        </select>
-                        <div id="editShiftId-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-2">
-                        <label for="editDeptId">Department</label>
-                        <select id="editDeptId" name="DeptId" class="form-control">
-                            <option value="">Select Department</option>
-                        </select>
-                        <div id="editDeptId-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-2">
-                        <label for="editDesigId">Designation</label>
-                        <select id="editDesigId" name="DesigId" class="form-control">
-                            <option value="">Select Designation</option>
-                        </select>
-                        <div id="editDesigId-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-2">
-                        <label for="editGender">Gender</label>
-                        <select id="editGender" name="Gender" class="form-control">
-                            <option value="">Select Gender</option>
-                            <option value="1">Male</option>
-                            <option value="2">Female</option>
-                            <option value="3">Other</option>
-                        </select>
-                        <div id="editGender-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-2">
-                        <label for="editGross">Gross Salary</label>
-                        <input type="number" class="form-control" id="editGross" name="Gross" step="0.01" />
-                        <div id="editGross-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-2">
-                        <label for="editDtJoin">Join Date</label>
-                        <input type="date" class="form-control" id="editDtJoin" name="DtJoin" />
-                        <div id="editDtJoin-error" class="text-danger"></div>
-                    </div>
-                    <div id="currentImage" class="mb-2"></div>
-                    <div class="form-group mb-2">
-                        <label for="editEmployeeImageFile">Upload New Image (optional)</label>
-                        <input type="file" class="form-control" id="editEmployeeImageFile" name="EmployeeImageFile" accept="image/*" />
-                        <div id="editEmployeeImageFile-error" class="text-danger"></div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Update</button>
                 </form>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Toast Notification -->
-<div class="toast-container position-fixed bottom-0 end-0 p-3">
-    <div id="successToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="toast-header">
-            <strong class="me-auto">Success</strong>
-            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    <!-- Toast Notification -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="successToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto">Success</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body"></div>
         </div>
-        <div class="toast-body"></div>
     </div>
 </div>
 
@@ -294,9 +307,12 @@
                         id: id
                     },
                     success: function (response) {
-                        alert(response.message);
                         if (response.success) {
                             $('#row-' + id).remove();
+                            $('#successToast .toast-body').text(response.message);
+                            $('#successToast').toast('show');
+                        } else {
+                            alert(response.message || "Failed to delete employee.");
                         }
                     },
                     error: function () {
@@ -307,12 +323,11 @@
         }
 
         function loadFilteredDropdowns(comId, selectedShiftId, selectedDeptId, selectedDesigId, isEdit = false) {
-            const shiftSelect = isEdit ? $('#editShiftId') : $('#createShiftId');
-            const deptSelect = isEdit ? $('#editDeptId') : $('#createDeptId');
-            const desigSelect = isEdit ? $('#editDesigId') : $('#createDesigId');
+            const shiftSelect = isEdit ? $('#editShift') : $('#createShiftId');
+            const deptSelect = isEdit ? $('#editDept') : $('#createDeptId');
+            const desigSelect = isEdit ? $('#editDesig') : '#createDesigId';
 
             if (!comId) {
-                console.warn('No comId provided');
                 shiftSelect.empty().append('<option value="">Select a company first</option>').prop('disabled', true);
                 deptSelect.empty().append('<option value="">Select a company first</option>').prop('disabled', true);
                 desigSelect.empty().append('<option value="">Select a company first</option>').prop('disabled', true);
@@ -320,97 +335,81 @@
             }
 
             return Promise.all([
-                $.getJSON(`/Employees/GetShiftsByCompany?comId=${comId}`)
-                    .then(data => {
-                        console.log('Shifts:', data);
-                        shiftSelect.empty().append('<option value="">-- Select Shift --</option>');
-                        if (data.length === 0) {
-                            shiftSelect.append('<option value="">No shifts available</option>');
-                        } else {
-                            data.forEach(s => shiftSelect.append(`<option value="${s.shiftId}">${s.shiftName || 'Unnamed'}</option>`));
-                        }
-                        if (selectedShiftId) shiftSelect.val(selectedShiftId);
-                        shiftSelect.prop('disabled', data.length === 0);
-                    })
-                    .fail((jqXHR, textStatus, error) => {
-                        console.error('Error fetching shifts:', textStatus, error);
-                        shiftSelect.empty().append('<option value="">Error loading shifts</option>').prop('disabled', true);
-                        alert('Failed to load shifts: ' + error);
-                    }),
-                $.getJSON(`/Employees/GetDeptsByCompany?comId=${comId}`)
-                    .then(data => {
-                        console.log('Departments:', data);
-                        deptSelect.empty().append('<option value="">-- Select Department --</option>');
-                        if (data.length === 0) {
-                            deptSelect.append('<option value="">No departments available</option>');
-                        } else {
-                            data.forEach(d => deptSelect.append(`<option value="${d.deptId}">${d.deptName || 'Unnamed'}</option>`));
-                        }
-                        if (selectedDeptId) deptSelect.val(selectedDeptId);
-                        deptSelect.prop('disabled', data.length === 0);
-                    })
-                    .fail((jqXHR, textStatus, error) => {
-                        console.error('Error fetching departments:', textStatus, error);
-                        deptSelect.empty().append('<option value="">Error loading departments</option>').prop('disabled', true);
-                        alert('Failed to load departments: ' + error);
-                    }),
-                $.getJSON(`/Employees/GetDesignationsByCompany?comId=${comId}`)
-                    .then(data => {
-                        console.log('Designations:', data);
-                        desigSelect.empty().append('<option value="">-- Select Designation --</option>');
-                        if (data.length === 0) {
-                            desigSelect.append('<option value="">No designations available</option>');
-                        } else {
-                            data.forEach(d => desigSelect.append(`<option value="${d.desigId}">${d.desigName || 'Unnamed'}</option>`));
-                        }
-                        if (selectedDesigId) desigSelect.val(selectedDesigId);
-                        desigSelect.prop('disabled', data.length === 0);
-                    })
-                    .fail((jqXHR, textStatus, error) => {
-                        console.error('Error fetching designations:', textStatus, error);
-                        desigSelect.empty().append('<option value="">Error loading designations</option>').prop('disabled', true);
-                        alert('Failed to load designations: ' + error);
-                    })
+                $.getJSON(`/Employees/GetShiftsByCompany?comId=${comId}`).then(data => {
+                    shiftSelect.empty().append('<option value="">-- Select Shift --</option>');
+                    if (!data || data.length === 0) {
+                        shiftSelect.append('<option value="">No shifts available</option>');
+                    } else {
+                        data.forEach(s => shiftSelect.append(
+                            `<option value="${s.shiftId}">${s.shiftName || 'Unnamed'}</option>`
+                        ));
+                    }
+                    if (selectedShiftId) shiftSelect.val(selectedShiftId);
+                    shiftSelect.prop('disabled', !data || data.length === 0);
+                }),
+                $.getJSON(`/Employees/GetDeptsByCompany?comId=${comId}`).then(data => {
+                    deptSelect.empty().append('<option value="">-- Select Department --</option>');
+                    if (!data || data.length === 0) {
+                        deptSelect.append('<option value="">No departments available</option>');
+                    } else {
+                        data.forEach(d => deptSelect.append(
+                            `<option value="${d.deptId}">${d.deptName || 'Unnamed'}</option>`
+                        ));
+                    }
+                    if (selectedDeptId) deptSelect.val(selectedDeptId);
+                    deptSelect.prop('disabled', !data || data.length === 0);
+                }),
+                $.getJSON(`/Employees/GetDesignationsByCompany?comId=${comId}`).then(data => {
+                    desigSelect.empty().append('<option value="">-- Select Designation --</option>');
+                    if (!data || data.length === 0) {
+                        desigSelect.append('<option value="">No designations available</option>');
+                    } else {
+                        data.forEach(d => desigSelect.append(
+                            `<option value="${d.desigId}">${d.desigName || 'Unnamed'}</option>`
+                        ));
+                    }
+                    if (selectedDesigId) desigSelect.val(selectedDesigId);
+                    desigSelect.prop('disabled', !data || data.length === 0);
+                })
             ]);
         }
 
         $(document).ready(function () {
-            console.log('Document ready - jQuery is loaded');
+            // Initialize company filter with cookie
+            var selectedComId = getCookie("SelectedComId");
+            if (selectedComId) {
+                $('#companyFilter').val(selectedComId);
+            }
 
+            // Initialize create modal
             $('#createModal').on('shown.bs.modal', function () {
-                console.log('Create modal shown');
                 var selectedComId = getCookie("SelectedComId");
-                console.log('Cookie SelectedComId:', selectedComId);
                 if (selectedComId) {
                     $('#createComId').val(selectedComId).trigger('change');
                 } else {
-                    $('#createShiftId').empty().append('<option value="">Select a company first</option>').prop('disabled', true);
-                    $('#createDeptId').empty().append('<option value="">Select a company first</option>').prop('disabled', true);
-                    $('#createDesigId').empty().append('<option value="">Select a company first</option>').prop('disabled', true);
+                    $('#createShiftId, #createDeptId, #createDesigId')
+                        .empty().append('<option value="">Select a company first</option>').prop('disabled', true);
                 }
             });
 
+            // Company change handlers
             $('#createComId').change(function () {
                 var comId = $(this).val();
-                console.log('Selected comId (create):', comId);
                 loadFilteredDropdowns(comId, null, null, null, false);
             });
 
-            $('#editComId').change(function () {
+            $('#editCompany').change(function () {
                 var comId = $(this).val();
-                console.log('Selected comId (edit):', comId);
                 loadFilteredDropdowns(comId, null, null, null, true);
             });
 
+            // Form validation setup
             function setupValidation(formId, prefix) {
                 $(formId).validate({
                     rules: {
                         ComId: { required: true },
                         EmpCode: { required: true },
                         EmpName: { required: true },
-                        ShiftId: { required: false },
-                        DeptId: { required: false },
-                        DesigId: { required: false },
                         Gender: { required: true },
                         Gross: { required: true, number: true, min: 1 },
                         DtJoin: { required: true },
@@ -420,29 +419,27 @@
                         ComId: "Please select a company.",
                         EmpCode: "Please enter employee code.",
                         EmpName: "Please enter employee name.",
-                        ShiftId: "Please select a shift.",
-                        DeptId: "Please select a department.",
-                        DesigId: "Please select a designation.",
                         Gender: "Please select gender.",
                         Gross: "Please enter a valid gross salary greater than 0.",
                         DtJoin: "Please enter a join date.",
                         EmployeeImageFile: "Please upload a valid image file (jpg, jpeg, png, gif)."
                     },
                     errorPlacement: function (error, element) {
-                        error.appendTo("#" + prefix + element.attr("name") + "-error");
+                        error.appendTo(`#${prefix}${element.attr("name")}-error`);
                     }
                 });
             }
 
             setupValidation("#createForm", "create");
-            setupValidation("#editForm", "edit");
+            setupValidation("#editEmployeeForm", "edit");
 
+            // Create Employee
             $("#createForm").submit(function (e) {
-                console.log('Form submission intercepted');
                 e.preventDefault();
                 if ($(this).valid()) {
                     let formData = new FormData(this);
                     formData.append("__RequestVerificationToken", $('input[name="__RequestVerificationToken"]').val());
+
                     let $button = $(this).find("button[type=submit]");
                     $button.text("Creating...").prop("disabled", true);
 
@@ -453,37 +450,61 @@
                         processData: false,
                         contentType: false,
                         success: function (response) {
-                            console.log("Create response:", response);
                             if (response.success) {
                                 $('#createModal').modal('hide');
-                                alert("Employee created successfully!");
+                                $('#successToast .toast-body').text(response.message);
+                                $('#successToast').toast('show');
+
                                 let newRow = `
-                                    <tr id="row-${response.employee.empId}" data-empid="${response.employee.empId}" data-comid="${response.employee.comId}" data-empcode="${response.employee.empCode}" data-empname="${response.employee.empName}" data-shiftid="${response.employee.shiftId}" data-deptid="${response.employee.deptId}" data-desigid="${response.employee.desigId}" data-gender="${response.employee.gender}" data-gross="${response.employee.gross}" data-dtjoin="${response.employee.dtJoin}" data-basic="${response.employee.basic}" data-hrent="${response.employee.hRent}" data-medical="${response.employee.medical}" data-others="${response.employee.others}" data-employeeimage="${response.employee.employeeImage || ''}">
+                                    <tr id="row-${response.employee.empId}"
+                                        data-empid="${response.employee.empId}"
+                                        data-comid="${response.employee.comId}"
+                                        data-empcode="${response.employee.empCode}"
+                                        data-empname="${response.employee.empName}"
+                                        data-shiftid="${response.employee.shiftId}"
+                                        data-deptid="${response.employee.deptId}"
+                                        data-desigid="${response.employee.desigId}"
+                                        data-gender="${response.employee.gender}"
+                                        data-gross="${response.employee.gross}"
+                                        data-basic="${response.employee.basic}"
+                                        data-hrent="${response.employee.hRent}"
+                                        data-medical="${response.employee.medical}"
+                                        data-others="${response.employee.others}"
+                                        data-dtjoin="${new Date(response.employee.dtJoin).toISOString().split('T')[0]}"
+                                        data-employeeimage="${response.employee.employeeImage || ''}">
                                         <td>${response.employee.empCode}</td>
                                         <td>${response.employee.empName}</td>
-                                        <td>${response.employee.employeeImage ? `<img src="${response.employee.employeeImage}" alt="Employee Image" width="50" height="50" />` : 'No Image'}</td>
+                                        <td>${
+                                            response.employee.employeeImage
+                                                ? `<img src="${response.employee.employeeImage}" alt="Employee Image" width="50" height="50" />`
+                                                : 'No Image'
+                                        }</td>
                                         <td>${response.employee.company?.comName || 'N/A'}</td>
                                         <td>${response.employee.shift?.shiftName || 'N/A'}</td>
                                         <td>${response.employee.department?.deptName || 'N/A'}</td>
                                         <td>${response.employee.designation?.desigName || 'N/A'}</td>
-                                        <td>${response.employee.gender === 1 ? 'Male' : response.employee.gender === 2 ? 'Female' : 'Other'}</td>
+                                        <td>${
+                                            response.employee.gender === 1 ? 'Male' :
+                                            response.employee.gender === 2 ? 'Female' : 'Other'
+                                        }</td>
                                         <td>${response.employee.gross}</td>
                                         <td>${response.employee.basic}</td>
                                         <td>${response.employee.hRent}</td>
                                         <td>${response.employee.medical}</td>
                                         <td>${response.employee.others}</td>
                                         <td>${new Date(response.employee.dtJoin).toISOString().split('T')[0]}</td>
-                                        <td><button class="btn btn-warning btn-sm edit-btn">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteEmployee('${response.employee.empId}')">Delete</button></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-warning edit-btn">Edit</button>
+                                            <button class="btn btn-sm btn-danger delete-btn" onclick="deleteEmployee('${response.employee.empId}')">Delete</button>
+                                        </td>
                                     </tr>`;
-                                $('#employeeTable').append(newRow);
+                                $('#employeeTable tbody').append(newRow);
                                 $("#createForm")[0].reset();
-                                $('#createShiftId, #createDeptId, #createDesigId').empty().append('<option value="">Select a company first</option>').prop('disabled', true);
                             } else {
                                 alert(response.message || "Failed to create employee.");
                             }
                         },
-                        error: function (xhr, status, error) {
-                            console.error("AJAX error:", xhr.responseText, status, error);
+                        error: function (xhr) {
                             alert("Failed to create employee: " + (xhr.responseJSON?.message || "Unknown error"));
                         },
                         complete: function () {
@@ -493,114 +514,105 @@
                 }
             });
 
-           $("#editForm").submit(function (e) {
-    e.preventDefault();
-    console.log("Edit form submission started");
-
-    if ($(this).valid()) {
-        console.log("Form is valid, proceeding with AJAX");
-        let formData = new FormData(this);
-        for (let pair of formData.entries()) {
-            console.log(pair[0] + ': ' + pair[1]);
-        }
-        formData.append("__RequestVerificationToken", $('input[name="__RequestVerificationToken"]').val());
-        let empId = $('#editEmpId').val();
-        console.log("Submitting edit for empId:", empId);
-        let $button = $(this).find("button[type=submit]");
-        $button.text("Updating...").prop("disabled", true);
-
-        $.ajax({
-           url: '@Url.Action("EmployeeEdit", "Employees")',
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function (response) {
-                console.log("Edit response:", response);
-                if (response.success) {
-                    $('#editModal').modal('hide');
-                    alert(response.message);
-
-                    let row = $('#row-' + empId);
-                    row.data({
-                        empcode: response.employee.empCode,
-                        empname: response.employee.empName,
-                        comid: response.employee.comId,
-                        shiftid: response.employee.shiftId,
-                        deptid: response.employee.deptId,
-                        desigid: response.employee.desigId,
-                        gender: response.employee.gender,
-                        gross: response.employee.gross,
-                        dtjoin: response.employee.dtJoin,
-                        basic: response.employee.basic,
-                        hrent: response.employee.hRent,
-                        medical: response.employee.medical,
-                        others: response.employee.others,
-                        employeeimage: response.employee.employeeImage || ''
-                    });
-
-                    row.find('td:eq(0)').text(response.employee.empCode);
-                    row.find('td:eq(1)').text(response.employee.empName);
-                    row.find('td:eq(2)').html(response.employee.employeeImage 
-                        ? `<img src="${response.employee.employeeImage}" alt="Employee Image" width="50" height="50" />` 
-                        : 'No Image');
-                    row.find('td:eq(3)').text(response.employee.company?.comName || 'N/A');
-                    row.find('td:eq(4)').text(response.employee.shift?.shiftName || 'N/A');
-                    row.find('td:eq(5)').text(response.employee.department?.deptName || 'N/A');
-                    row.find('td:eq(6)').text(response.employee.designation?.desigName || 'N/A');
-                    row.find('td:eq(7)').text(
-                        response.employee.gender === 1 ? 'Male' :
-                        response.employee.gender === 2 ? 'Female' : 'Other'
-                    );
-                    row.find('td:eq(8)').text(response.employee.gross);
-                    row.find('td:eq(9)').text(response.employee.basic);
-                    row.find('td:eq(10)').text(response.employee.hRent);
-                    row.find('td:eq(11)').text(response.employee.medical);
-                    row.find('td:eq(12)').text(response.employee.others);
-                    row.find('td:eq(13)').text(new Date(response.employee.dtJoin).toISOString().split('T')[0]);
-                } else {
-                    console.log("Edit failed:", response.message);
-                    alert(response.message || "Failed to update employee.");
-                }
-            },
-            error: function (xhr, status, error) {
-                console.error("AJAX error:", xhr.status, status, error, xhr.responseText);
-                alert("Failed to update employee: " + (xhr.responseJSON?.message || "Unknown error"));
-            },
-            complete: function () {
-                $button.text("Update").prop("disabled", false);
-            }
-        });
-    } else {
-        console.log("Form validation failed");
-        alert("Please fill all required fields correctly.");
-    }
-});
-
+            // Open Edit Modal
             $(document).on('click', '.edit-btn', function () {
-                var row = $(this).closest('tr');
+                const row = $(this).closest('tr');
+
                 $('#editEmpId').val(row.data('empid'));
                 $('#editEmpCode').val(row.data('empcode'));
                 $('#editEmpName').val(row.data('empname'));
                 $('#editGender').val(row.data('gender'));
                 $('#editGross').val(row.data('gross'));
                 $('#editDtJoin').val(row.data('dtjoin'));
+                $('#editCompany').val(row.data('comid'));
 
-                var employeeImage = row.data('employeeimage');
-                $('#currentImage').html(employeeImage ? `<img src="${employeeImage}" style="max-width:200px;" /><p>Current image (upload new to replace)</p>` : '<p>No current image</p>');
-
-                var comId = row.data('comid');
-                $('#editComId').val(comId);
+                const employeeImage = row.data('employeeimage');
+                $('#currentImage').html(employeeImage
+                    ? `<img src="${employeeImage}" style="max-width:200px;" /><p>Current image (upload new to replace)</p>`
+                    : '<p>No current image</p>');
 
                 loadFilteredDropdowns(
-                    comId, 
-                    row.data('shiftid'), 
-                    row.data('deptid'), 
-                    row.data('desigid'), 
+                    row.data('comid'),
+                    row.data('shiftid'),
+                    row.data('deptid'),
+                    row.data('desigid'),
                     true
                 ).then(() => {
-                    $('#editModal').modal('show');
+                    $('#editEmployeeModal').modal('show');
                 });
+            });
+
+            // Edit Employee
+            $("#editEmployeeForm").submit(function (e) {
+                e.preventDefault();
+                if ($(this).valid()) {
+                    const formData = new FormData(this);
+                    formData.append("__RequestVerificationToken", $('input[name="__RequestVerificationToken"]').val());
+                    const empId = $('#editEmpId').val();
+
+                    const $button = $(this).find("button[type=submit]");
+                    $button.text("Updating...").prop("disabled", true);
+
+                    $.ajax({
+                        url: '@Url.Action("EmployeeEdit", "Employees")',
+                        type: 'POST',
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        success: function (response) {
+                            if (response.success) {
+                                $('#editEmployeeModal').modal('hide');
+                                $('#successToast .toast-body').text(response.message);
+                                $('#successToast').toast('show');
+
+                                const row = $('#row-' + empId);
+                                row.find('td:eq(0)').text(response.employee.empCode);
+                                row.find('td:eq(1)').text(response.employee.empName);
+                                row.find('td:eq(2)').html(response.employee.employeeImage
+                                    ? `<img src="${response.employee.employeeImage}" alt="Employee Image" width="50" height="50" />`
+                                    : 'No Image');
+                                row.find('td:eq(3)').text(response.employee.company?.comName || 'N/A');
+                                row.find('td:eq(4)').text(response.employee.shift?.shiftName || 'N/A');
+                                row.find('td:eq(5)').text(response.employee.department?.deptName || 'N/A');
+                                row.find('td:eq(6)').text(response.employee.designation?.desigName || 'N/A');
+                                row.find('td:eq(7)').text(
+                                    response.employee.gender === 1 ? 'Male' :
+                                    response.employee.gender === 2 ? 'Female' : 'Other'
+                                );
+                                row.find('td:eq(8)').text(response.employee.gross);
+                                row.find('td:eq(9)').text(response.employee.basic);
+                                row.find('td:eq(10)').text(response.employee.hRent);
+                                row.find('td:eq(11)').text(response.employee.medical);
+                                row.find('td:eq(12)').text(response.employee.others);
+                                row.find('td:eq(13)').text(new Date(response.employee.dtJoin).toISOString().split('T')[0]);
+
+                                // Keep data-* in sync
+                                row.data('empcode', response.employee.empCode);
+                                row.data('empname', response.employee.empName);
+                                row.data('comid', response.employee.comId);
+                                row.data('shiftid', response.employee.shiftId);
+                                row.data('deptid', response.employee.deptId);
+                                row.data('desigid', response.employee.desigId);
+                                row.data('gender', response.employee.gender);
+                                row.data('gross', response.employee.gross);
+                                row.data('basic', response.employee.basic);
+                                row.data('hrent', response.employee.hRent);
+                                row.data('medical', response.employee.medical);
+                                row.data('others', response.employee.others);
+                                row.data('dtjoin', new Date(response.employee.dtJoin).toISOString().split('T')[0]);
+                                row.data('employeeimage', response.employee.employeeImage || '');
+                            } else {
+                                alert(response.message || "Failed to update employee.");
+                            }
+                        },
+                        error: function (xhr) {
+                            alert("Failed to update employee: " + (xhr.responseJSON?.message || "Unknown error"));
+                        },
+                        complete: function () {
+                            $button.text("Save Changes").prop("disabled", false);
+                        }
+                    });
+                }
             });
         });
     </script>

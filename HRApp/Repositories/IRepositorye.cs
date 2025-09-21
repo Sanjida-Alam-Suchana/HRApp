@@ -1,4 +1,5 @@
-﻿using System;
+﻿using HRApp.Models;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -35,6 +36,7 @@ namespace HRApp.Repositories
         /// Add a new entity.
         /// </summary>
         Task AddAsync(T entity);
+        Task AddRangeAsync(IEnumerable<T> entities);
 
         /// <summary>
         /// Update an existing entity.
@@ -61,5 +63,6 @@ namespace HRApp.Repositories
         /// </summary>
         IQueryable<T> GetQueryable();
         Task ExecuteSqlRawAsync(string sql, params object[] parameters);
+        //Task AddRangeAsync(List<Attendance> attendances);
     }
 }

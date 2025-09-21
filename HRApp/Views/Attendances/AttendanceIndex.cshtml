@@ -5,185 +5,86 @@
     var companies = ViewBag.Companies as List<Company> ?? new List<Company>();
     var employees = ViewBag.Employees as List<Employee> ?? new List<Employee>();
 }
-
 <div class="container mt-4">
-    <h2>Attendance List</h2>
+    <h2>Create Attendance (Single)</h2>
 
-    <!-- Single Attendance Form -->
-    <div class="card mb-4 p-3">
-        <h4>Create New Attendance (Single)</h4>
-        <form id="createAttendanceForm">
-            @Html.AntiForgeryToken()
-            <div class="form-group mb-3">
-                <label for="ComId">Company</label>
-                <select id="ComId" name="ComId" class="form-control" required>
-                    <option value="">Select Company</option>
-                    @foreach (var company in companies)
-                    {
-                        <option value="@company.ComId">@company.ComName</option>
-                    }
-                </select>
-            </div>
-            <div class="form-group mb-3">
-                <label for="EmpId">Employee</label>
-                <select id="EmpId" name="EmpId" class="form-control" required>
-                    <option value="">Select Employee</option>
-                    @foreach (var employee in employees)
-                    {
-                        <option value="@employee.EmpId" data-comid="@employee.ComId.ToString()" data-shift-starttime="@(employee.Shift?.StartTime.ToString("HH:mm") ?? "")">@employee.EmpName</option>
-                    }
-                </select>
-            </div>
-            <div class="form-group mb-3">
-                <label for="dtDate">Date</label>
-                <input type="date" id="dtDate" name="dtDate" class="form-control" required />
-            </div>
-            <div class="form-group mb-3">
-                <label for="InTime">In Time</label>
-                <input type="time" id="InTime" name="InTime" class="form-control" required />
-            </div>
-            <div class="form-group mb-3">
-                <label for="OutTime">Out Time</label>
-                <input type="time" id="OutTime" name="OutTime" class="form-control" required />
-            </div>
-            <div class="form-group mb-3">
-                <label for="AttStatus">Status</label>
-                <select id="AttStatus" name="AttStatus" class="form-control" required>
-                    <option value="P">Present</option>
-                    <option value="L">Late</option>
-                    <option value="A">Absent</option>
-                </select>
-            </div>
-            <button type="submit" class="btn btn-primary">Create</button>
-        </form>
-    </div>
-
-    <!-- Bulk Attendance Form -->
-    <div class="card mb-4 p-3">
-        <h4>Bulk Attendance Entry</h4>
-        <form id="bulkAttendanceForm">
-            @Html.AntiForgeryToken()
-            <div class="form-group mb-3">
-                <label for="bulkComId">Company</label>
-                <select id="bulkComId" name="ComId" class="form-control" required>
-                    <option value="">Select Company</option>
-                    @foreach (var company in companies)
-                    {
-                        <option value="@company.ComId">@company.ComName</option>
-                    }
-                </select>
-            </div>
-            <div class="form-group mb-3">
-                <label for="bulkDtDate">Date</label>
-                <input type="date" id="bulkDtDate" name="dtDate" class="form-control" required />
-            </div>
-
-            <table class="table table-bordered" id="bulkEmployeeTable">
-                <thead>
-                    <tr>
-                        <th>Select</th>
-                        <th>Employee</th>
-                        <th>In Time</th>
-                        <th>Out Time</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var employee in employees)
-                    {
-                        <tr data-comid="@employee.ComId">
-                            <td><input type="checkbox" name="EmpIds" value="@employee.EmpId" /></td>
-                            <td>@employee.EmpName</td>
-                            <td><input type="time" name="InTimes" class="form-control" /></td>
-                            <td><input type="time" name="OutTimes" class="form-control" /></td>
-                            <td>
-                                <select name="AttStatuses" class="form-control">
-                                    <option value="P">Present</option>
-                                    <option value="L">Late</option>
-                                    <option value="A">Absent</option>
-                                </select>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-            <button type="submit" class="btn btn-success">Save Bulk Attendance</button>
-        </form>
-    </div>
-
-    <!-- Company Dropdown Filter -->
-    <select id="companyDropdown" class="form-select mb-3" onchange="setCompany(this.value)">
-        <option value="">Select Company</option>
-        @foreach (var company in companies)
-        {
-            <option value="@company.ComId.ToString()">@company.ComName</option>
-        }
-    </select>
-
-    <!-- Hidden AntiForgery token -->
-    <form id="antiForgeryForm">
+    <form id="createAttendanceForm">
         @Html.AntiForgeryToken()
-    </form>
 
-    <!-- Edit Modal -->
-    <div class="modal fade" id="editAttendanceModal" tabindex="-1" aria-labelledby="editAttendanceModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editAttendanceModalLabel">Edit Attendance</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="editAttendanceForm">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" id="editId" name="Id" />
-                        <div class="form-group mb-3">
-                            <label for="editComId">Company</label>
-                            <select id="editComId" name="ComId" class="form-control" required>
-                                <option value="">Select Company</option>
-                                @foreach (var company in companies)
-                                {
-                                    <option value="@company.ComId">@company.ComName</option>
-                                }
-                            </select>
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="editEmpId">Employee</label>
-                            <select id="editEmpId" name="EmpId" class="form-control" required>
-                                <option value="">Select Employee</option>
-                                @foreach (var employee in employees)
-                                {
-                                    <option value="@employee.EmpId" data-comid="@employee.ComId.ToString()" data-shift-starttime="@(employee.Shift?.StartTime.ToString("HH:mm") ?? "")">@employee.EmpName</option>
-                                }
-                            </select>
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="editDtDate">Date</label>
-                            <input type="date" id="editDtDate" name="dtDate" class="form-control" required />
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="editInTime">In Time</label>
-                            <input type="time" id="editInTime" name="InTime" class="form-control" required />
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="editOutTime">Out Time</label>
-                            <input type="time" id="editOutTime" name="OutTime" class="form-control" required />
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="editAttStatus">Status</label>
-                            <select id="editAttStatus" name="AttStatus" class="form-control" required>
-                                <option value="P">Present</option>
-                                <option value="L">Late</option>
-                                <option value="A">Absent</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Save</button>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    </form>
-                </div>
-            </div>
+        <div class="form-group mb-3">
+            <label for="ComId">Company</label>
+            <select id="ComId" name="ComId" class="form-control" required>
+                <option value="">-- Select Company --</option>
+                @foreach (var company in companies)
+                {
+                    <option value="@company.ComId">@company.ComName</option>
+                }
+            </select>
         </div>
+
+        <div class="form-group mb-3">
+            <label for="EmpId">Employee</label>
+            <select id="EmpId" name="EmpId" class="form-control" required>
+                <option value="">-- Select Employee --</option>
+                <!-- JS দিয়ে এখানে populate হবে -->
+            </select>
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="dtDate">Date</label>
+            <input type="date" id="dtDate" name="dtDate" class="form-control" required />
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="InTime">In Time</label>
+            <input type="time" id="InTime" name="InTime" class="form-control" required />
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="OutTime">Out Time</label>
+            <input type="time" id="OutTime" name="OutTime" class="form-control" required />
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="AttStatus">Status</label>
+            <select id="AttStatus" name="AttStatus" class="form-control" required>
+                <option value="P">Present</option>
+                <option value="L">Late</option>
+                <option value="A">Absent</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Create</button>
+    </form>
+</div>
+    <div class="container mt-4">
+        <h2>Bulk Attendance (Excel)</h2>
+
+        <!-- Company select -->
+        <div class="mb-3">
+            <label>Select Company</label>
+            <select id="bulkComId" class="form-control">
+                <option value="">--Select Company--</option>
+                @foreach (var company in companies)
+                {
+                    <option value="@company.ComId">@company.ComName</option>
+                }
+            </select>
+        </div>
+        <!-- Download Template -->
+        <button type="button" id="downloadTemplateBtn" class="btn btn-info mb-3">Download Excel Template</button>
+        <!-- Excel Upload Form -->
+        <form id="uploadExcelForm" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <div class="mb-3">
+                <input type="file" name="file" class="form-control" accept=".xlsx" required />
+            </div>
+            <button type="submit" class="btn btn-success">Upload & Save</button>
+        </form>
+
+        <div id="uploadResult" class="mt-3"></div>
     </div>
+
 
     <!-- Attendance List Table -->
     <table class="table table-bordered">
@@ -200,10 +101,9 @@
         <tbody id="attendanceTable">
             @foreach (var item in Model)
             {
-                var employeeName = item.Employee?.EmpName ?? "N/A";
-                <tr id="row-@item.Id" data-comid="@item.ComId.ToString()" data-empid="@item.EmpId" data-dtdate="@item.dtDate.ToString("yyyy-MM-dd")" data-intime="@item.InTime.ToString("HH:mm")" data-outtime="@item.OutTime.ToString("HH:mm")" data-attstatus="@item.AttStatus">
+                <tr id="row-@item.Id">
                     <td>@item.dtDate.ToString("yyyy-MM-dd")</td>
-                    <td>@employeeName</td>
+                    <td>@item.Employee?.EmpName ?? "N/A"</td>
                     <td>@item.AttStatus</td>
                     <td>@item.InTime.ToString("HH:mm")</td>
                     <td>@item.OutTime.ToString("HH:mm")</td>
@@ -219,91 +119,104 @@
 
 @section Scripts {
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        $(document).ready(function () {
+              $(document).ready(function () {
 
-$("#ComId").change(function () {
-    var comId = $(this).val();
-    $("#EmpId option").each(function () {
-        var empComId = $(this).data("comid");
-        if (comId === "" || empComId == comId) {
-            $(this).show();
-        } else {
-            $(this).hide();
-        }
-    });
-    $("#EmpId").val(""); // Reset employee selection
-});
+            // 🔹 Filter employees by company
+            $("#ComId").change(function () {
+                var comId = $(this).val();
+                var employeeDropdown = $("#EmpId");
+                employeeDropdown.empty();
+                employeeDropdown.append('<option value="">-- Select Employee --</option>');
 
-// === Edit Modal Employee Filter ===
-$("#editComId").change(function () {
-    var comId = $(this).val();
-    $("#editEmpId option").each(function () {
-        var empComId = $(this).data("comid");
-        if (comId === "" || empComId == comId) {
-            $(this).show();
-        } else {
-            $(this).hide();
-        }
-    });
-    $("#editEmpId").val(""); // Reset employee selection
-});
-$("#bulkEmployeeTable tbody tr").hide(); // hide all initially
+                if (!comId) return; // কোন company select না করলে
 
-$("#bulkComId").change(function () {
-    var comId = $(this).val();
-    $("#bulkEmployeeTable tbody tr").each(function () {
-        var empComId = $(this).data("comid");
-        $(this).toggle(comId === "" || empComId === comId);
-    });
-});
+                $.getJSON('/Attendances/GetEmployeesByCompany', { comId: comId }, function (data) {
+                    if (data.length === 0) {
+                        employeeDropdown.append('<option value="">No employees found</option>');
+                        return;
+                    }
+                    $.each(data, function (i, employee) {
+                        employeeDropdown.append('<option value="' + employee.empId + '">' + employee.empName + '</option>');
+                    });
+                });
+            });
 
-   $("#bulkAttendanceForm").submit(function (e) {
-                e.preventDefault();  // Prevent normal form submission
-                var selectedEmployees = [];
-                $("#bulkEmployeeTable tbody tr").each(function () {
-                    var checkbox = $(this).find("input[type=checkbox]");
-                    if (checkbox.is(":checked")) {
-                        selectedEmployees.push({
-                            EmpId: checkbox.val(),
-                            InTime: $(this).find("input[name='InTimes']").val(),
-                            OutTime: $(this).find("input[name='OutTimes']").val(),
-                            AttStatus: $(this).find("select[name='AttStatuses']").val(),
-                            dtDate: $("#bulkDtDate").val(),
-                            ComId: $("#bulkComId").val()
-                        });
+            // 🔹 Submit single attendance
+            $("#createAttendanceForm").submit(function (e) {
+                e.preventDefault();
+                var formData = $(this).serialize();
+
+                $.post('/Attendances/AttendanceCreate', formData, function (response) {
+                    alert(response.message || "Attendance created successfully.");
+                    if (response.success) {
+                        var att = response.attendance;
+
+                        // নতুন row append
+                        $("#attendanceTable").append(`
+                            <tr id="row-${att.id}">
+                                <td>${att.date}</td>
+                                <td>${att.empName}</td>
+                                <td>${att.attStatus}</td>
+                                <td>${att.inTime}</td>
+                                <td>${att.outTime}</td>
+                                <td>
+                                    <button class="btn btn-warning btn-sm" onclick="openEditModal('${att.id}')">Edit</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteAttendance('${att.id}')">Delete</button>
+                                </td>
+                            </tr>
+                        `);
+
+                        // ফর্ম reset
+                        $("#createAttendanceForm")[0].reset();
+                        $("#EmpId").empty().append('<option value="">-- Select Employee --</option>'); // Employee dropdown reset
                     }
                 });
-
-    if (selectedEmployees.length === 0) { alert("Please select at least one employee."); return; }
-
-    $.ajax({
-        url: '/Attendances/BulkCreate', // your existing bulk save action
-        type: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify(selectedEmployees),
-        headers: { "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
-        success: function (response) {
-            alert(response.message);
-
-            if(response.success) {
-                // Trigger download after saving
-                var comId = $("#bulkComId").val();
-                var dtDate = $("#bulkDtDate").val();
-                window.location.href = `/Attendances/DownloadBulkAttendance?comId=${comId}&dtDate=${dtDate}`;
-            }
-        },
-        error: function () { alert("Bulk attendance failed."); }
-    });
-});
-
-
-        function setCompany(comId) {
-            $("#attendanceTable tr").each(function () {
-                var rowComId = $(this).data("comid");
-                $(this).toggle(comId === "" || rowComId === comId);
             });
-        }
+
+        });
+
+            // Load employees for bulk attendance
+                $("#bulkComId").change(function(){
+            var comId = $(this).val();
+            var tbody = $("#bulkEmployeeTable tbody");
+            tbody.empty();
+            if(!comId) return;
+
+            $.getJSON(`/Attendances/GetEmployeesByCompany?comId=${comId}`, function(employees){
+                if(!employees.length) {
+                    tbody.append('<tr><td colspan="5">No employees found.</td></tr>');
+                    return;
+                }
+                employees.forEach(emp => {
+                    tbody.append(`
+                        <tr>
+                            <td><input type="checkbox" name="EmpIds" value="${emp.empId}"></td>
+                            <td>${emp.empName}</td>
+                            <td><input type="time" name="InTimes" class="form-control" value="09:00"></td>
+                            <td><input type="time" name="OutTimes" class="form-control" value="17:00"></td>
+                            <td>
+                                <select name="AttStatuses" class="form-control">
+                                    <option value="P">Present</option>
+                                    <option value="L">Late</option>
+                                    <option value="A">Absent</option>
+                                </select>
+                            </td>
+                        </tr>
+                    `);
+                });
+            });
+        });
+
+                // Download Excel Template
+        $("#downloadTemplateBtn").click(function () {
+            var comId = $("#bulkComId").val();
+            if (!comId) {
+                alert("Please select a company first.");
+                return;
+            }
+            window.location.href = `/Attendances/DownloadAttendanceTemplate?comId=${comId}`;
+        });
+
     </script>
 }
