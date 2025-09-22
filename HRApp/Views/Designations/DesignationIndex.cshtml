@@ -92,6 +92,7 @@ $(document).ready(function(){
                 alert(res.message || "No message returned from server");
                 if (res.success && res.designation) {
                     let d = res.designation;
+                    console.log("Parsed designation data:", d); // Debug parsed data
                     let newRow = `
                         <tr id="row-${d.desigId}">
                             <td>${d.desigName}</td>
@@ -127,6 +128,7 @@ $(document).ready(function(){
         $.getJSON(url, function(data){
             console.log("Filter response:", data); // Debug filter response
             $.each(data, function(i, d){
+                console.log("Filtered designation:", d); // Debug each item
                 let row = `
                     <tr id="row-${d.desigId}">
                         <td>${d.desigName}</td>
@@ -190,7 +192,7 @@ $(document).ready(function(){
             url: '/Designations/DesignationEdit/' + id,
             type: 'POST',
             headers: { "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
-            data: { desigId: id, desigName: newName, comId: comId },
+            data: { DesigId: id, DesigName: newName, ComId: comId }, // PascalCase for model binding
             success: function(res){
                 console.log("Edit response:", res); // Debug edit response
                 alert(res.message || "No message returned from server");

@@ -1,4 +1,5 @@
-﻿@model HRApp.Models.AttendanceSummary
+﻿<!-- AttendanceSummaryGenerate.cshtml (Updated to use type="month", AJAX sends SummaryMonth as yyyy-MM, updated validation) -->
+@model HRApp.Models.AttendanceSummary
 @using HRApp.Models
 @{
     ViewData["Title"] = "Generate Attendance Summary";
@@ -21,18 +22,8 @@
             <div id="ComId-error" class="text-danger"></div>
         </div>
         <div class="form-group mb-3">
-            <label for="SummaryYear">Year</label>
-            <input type="number" class="form-control" id="SummaryYear" name="SummaryYear" value="@DateTime.Now.Year" min="2000" max="2100" />
-            <div id="SummaryYear-error" class="text-danger"></div>
-        </div>
-        <div class="form-group mb-3">
             <label for="SummaryMonth">Month</label>
-            <select id="SummaryMonth" name="SummaryMonth" class="form-control">
-                @for (int m = 1; m <= 12; m++)
-                {
-                    <option value="@m" selected="@(m == DateTime.Now.Month ? true : false)">@m.ToString("D2")</option>
-                }
-            </select>
+            <input type="month" class="form-control" id="SummaryMonth" name="SummaryMonth" value="@DateTime.Now.ToString("yyyy-MM")" />
             <div id="SummaryMonth-error" class="text-danger"></div>
         </div>
         <button type="submit" class="btn btn-primary">Generate Summary</button>
@@ -48,12 +39,10 @@
         $("#generateForm").validate({
             rules: {
                 ComId: { required: true },
-                SummaryYear: { required: true, number: true, min: 2000, max: 2100 },
                 SummaryMonth: { required: true }
             },
             messages: {
                 ComId: "Please select a company.",
-                SummaryYear: "Please enter a valid year between 2000 and 2100.",
                 SummaryMonth: "Please select a month."
             },
             errorPlacement: function (error, element) {
@@ -65,16 +54,15 @@
             e.preventDefault();
             if ($(this).valid()) {
                 var comId = $("#ComId").val();
-                var year = $("#SummaryYear").val();
-                var month = $("#SummaryMonth").val();
-                
+                var summaryMonth = $("#SummaryMonth").val();
+
                 $.ajax({
                     url: '/AttendanceSummaries/AttendanceSummaryGenerate',
                     type: 'POST',
                     data: {
                         __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val(),
                         ComId: comId,
-                        SummaryMonth: year + '-' + month + '-01'
+                        SummaryMonth: summaryMonth
                     },
                     success: function (response) {
                         alert(response.message);
@@ -82,7 +70,13 @@
                             window.location.href = '/AttendanceSummaries/AttendanceSummaryIndex';
                         }
                     },
-                    error: function (xhr) {
+                    error: function (xhr, status, error) {
+                        console.log("AJAX Error:", {
+                            status: status,
+                            error: error,
+                            responseText: xhr.responseText,
+                            responseJSON: xhr.responseJSON
+                        });
                         alert("Failed to generate summary: " + (xhr.responseJSON?.message || "Unknown error"));
                     }
                 });

@@ -32,13 +32,11 @@ namespace HRApp.Repositories
         public IRepository<Attendance> Attendances => _attendances ??= new Repository<Attendance>(_context);
         public IRepository<Salary> Salaries => _salaries ??= new Repository<Salary>(_context);
         public IRepository<AttendanceSummary> AttendanceSummaries => _attendanceSummaries ??= new Repository<AttendanceSummary>(_context);
-        public IEmployeeRepository Employee { get; private set; }
-        public IDepartmentRepository Department { get; private set; }
+       
         public UnitOfWork(ApplicationDbContext context)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
-            //Employee = new EmployeeRepository(_context);
-            Department = new DepartmentRepository(_context);
+           
         }
 
         public async Task<int> SaveAsync() // Changed from void to Task<int>

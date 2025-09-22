@@ -29,15 +29,33 @@ namespace HRApp.Controllers
 
             return View();
         }
-
         [HttpGet]
         public async Task<IActionResult> GetDepartmentsByCompany(Guid companyId)
         {
-            var departments = await _unitOfWork.Departments.GetAllAsync();
-            var filtered = departments.Where(d => d.ComId == companyId)
-                .Select(d => new { Id = d.DeptId, Name = d.DeptName });
-            return Json(filtered);
+            try
+            {
+                var departments = await _unitOfWork.Departments
+                    .GetQueryable()
+                    .Where(d => d.ComId == companyId)
+                    .Select(d => new { id = d.DeptId, name = d.DeptName })
+                    .OrderBy(d => d.name)
+                    .ToListAsync();
+
+                return Json(departments); 
+            }
+            catch (Exception ex)
+            {
+                return Json(new { error = ex.Message });
+            }
         }
+        //[HttpGet]
+        //public async Task<IActionResult> GetDepartmentsByCompany(Guid companyId)
+        //{
+        //    var departments = await _unitOfWork.Departments.GetAllAsync();
+        //    var filtered = departments.Where(d => d.ComId == companyId)
+        //        .Select(d => new { Id = d.DeptId, Name = d.DeptName });
+        //    return Json(filtered);
+        //}
 
         [HttpPost]
         public async Task<IActionResult> GetEmployeeList(Guid? companyId, Guid? departmentId)
@@ -148,59 +166,76 @@ namespace HRApp.Controllers
         [HttpPost]
         public async Task<IActionResult> GetAttendanceList(Guid? companyId, Guid? departmentId, DateTime? fromDate, DateTime? toDate)
         {
-            if (!companyId.HasValue) return BadRequest("Company required.");
-            if (!fromDate.HasValue || !toDate.HasValue || fromDate > toDate) return BadRequest("Invalid date range.");
-
-            var totalDays = (toDate.Value - fromDate.Value).Days + 1; // This works with DateTime for totalDays calc
-
-            // Convert DateTime? to DateOnly for comparison
-            var fromDateOnly = DateOnly.FromDateTime(fromDate.Value);
-            var toDateOnly = DateOnly.FromDateTime(toDate.Value);
-
-            var employeesQuery = _unitOfWork.Employees.GetQueryable()
-                .Include(e => e.Department)
-                .Where(e => e.ComId == companyId.Value);
-
-            if (departmentId.HasValue && departmentId != Guid.Empty)
+            try
             {
-                employeesQuery = employeesQuery.Where(e => e.DeptId == departmentId.Value);
-            }
+                if (!companyId.HasValue || companyId == Guid.Empty)
+                    return Json(new { success = false, message = "Company required." });
 
-            var employees = await employeesQuery.ToListAsync();
+                if (!fromDate.HasValue || !toDate.HasValue || fromDate > toDate)
+                    return Json(new { success = false, message = "Invalid date range." });
 
-            var attendances = await _unitOfWork.Attendances.GetQueryable()
-                .Where(a => a.ComId == companyId.Value
-                    && a.dtDate >= fromDateOnly
-                    && a.dtDate <= toDateOnly)
-                .ToListAsync();
+                var totalDays = (toDate.Value.Date - fromDate.Value.Date).Days + 1;
 
-            var attendanceCounts = attendances.GroupBy(a => a.EmpId)
-                .ToDictionary(
-                    g => g.Key,
-                    g => new
-                    {
-                        Present = g.Count(a => a.AttStatus == "P"),
-                        Late = g.Count(a => a.AttStatus == "L"),
-                        AbsentRecorded = g.Count(a => a.AttStatus == "A")
-                    }
-                );
+                // Convert DateTime to DateOnly for comparison
+                var fromDateOnly = DateOnly.FromDateTime(fromDate.Value.Date);
+                var toDateOnly = DateOnly.FromDateTime(toDate.Value.Date);
 
-            var result = employees.Select(e =>
-            {
-                var counts = attendanceCounts.GetValueOrDefault(e.EmpId) ?? new { Present = 0, Late = 0, AbsentRecorded = 0 };
-                var attended = counts.Present + counts.Late;
-                var absent = counts.AbsentRecorded + (totalDays - (attended + counts.AbsentRecorded));
-                return new
+                // Get employees by department filter
+                var employeesQuery = _unitOfWork.Employees.GetQueryable()
+                    .Include(e => e.Department)
+                    .Where(e => e.ComId == companyId.Value);
+
+                if (departmentId.HasValue && departmentId != Guid.Empty)
                 {
-                    EmployeeName = e.EmpName,
-                    TotalPresent = attended,
-                    TotalAbsent = absent,
-                    TotalLate = counts.Late,
-                    TotalAbsentAgain = absent // Duplicated to match PDF's repeated "Total absent"
-                };
-            });
+                    employeesQuery = employeesQuery.Where(e => e.DeptId == departmentId.Value);
+                }
 
-            return Json(result);
+                var employees = await employeesQuery.OrderBy(e => e.EmpName).ToListAsync();
+
+                // Get all attendances in date range for this company
+                var attendances = await _unitOfWork.Attendances.GetQueryable()
+                    .Include(a => a.Employee)
+                    .Where(a => a.ComId == companyId.Value
+                        && a.dtDate >= fromDateOnly
+                        && a.dtDate <= toDateOnly)
+                    .ToListAsync();
+
+                // Calculate attendance counts per employee
+                var attendanceCounts = attendances.GroupBy(a => a.EmpId)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => new
+                        {
+                            Present = g.Count(a => a.AttStatus == "P"),
+                            Late = g.Count(a => a.AttStatus == "L"),
+                            AbsentRecorded = g.Count(a => a.AttStatus == "A")
+                        }
+                    );
+
+                var result = employees.Select(e =>
+                {
+                    var counts = attendanceCounts.GetValueOrDefault(e.EmpId,
+                        new { Present = 0, Late = 0, AbsentRecorded = 0 });
+
+                    var attended = counts.Present + counts.Late;
+                    var totalAbsent = totalDays - attended;
+
+                    return new
+                    {
+                        employeeName = e.EmpName,  
+                        totalPresent = attended,
+                        totalAbsent = totalAbsent,
+                        totalLate = counts.Late,
+                        totalAbsentAgain = totalAbsent  
+                    };
+                }).ToList();
+
+                return Json(new { success = true, data = result, totalCount = result.Count, totalDays = totalDays });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
         }
 
         // Download CSV

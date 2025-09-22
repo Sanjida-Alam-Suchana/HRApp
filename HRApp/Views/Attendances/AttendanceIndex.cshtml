@@ -3,91 +3,46 @@
 @{
     ViewData["Title"] = "Attendance List";
     var companies = ViewBag.Companies as List<Company> ?? new List<Company>();
-    var employees = ViewBag.Employees as List<Employee> ?? new List<Employee>();
 }
+
 <div class="container mt-4">
     <h2>Create Attendance (Single)</h2>
 
-    <form id="createAttendanceForm">
+    <form id="createAttendanceForm" method="post">
         @Html.AntiForgeryToken()
-
         <div class="form-group mb-3">
-            <label for="ComId">Company</label>
+            <label>Company</label>
             <select id="ComId" name="ComId" class="form-control" required>
                 <option value="">-- Select Company --</option>
-                @foreach (var company in companies)
+                @foreach(var company in companies)
                 {
                     <option value="@company.ComId">@company.ComName</option>
                 }
             </select>
         </div>
-
         <div class="form-group mb-3">
-            <label for="EmpId">Employee</label>
+            <label>Employee</label>
             <select id="EmpId" name="EmpId" class="form-control" required>
                 <option value="">-- Select Employee --</option>
-                <!-- JS দিয়ে এখানে populate হবে -->
             </select>
         </div>
-
         <div class="form-group mb-3">
-            <label for="dtDate">Date</label>
-            <input type="date" id="dtDate" name="dtDate" class="form-control" required />
+            <label>Date</label>
+            <input type="date" name="dtDate" class="form-control" required />
         </div>
-
         <div class="form-group mb-3">
-            <label for="InTime">In Time</label>
-            <input type="time" id="InTime" name="InTime" class="form-control" required />
+            <label>In Time</label>
+            <input type="time" name="InTime" class="form-control" required />
         </div>
-
         <div class="form-group mb-3">
-            <label for="OutTime">Out Time</label>
-            <input type="time" id="OutTime" name="OutTime" class="form-control" required />
+            <label>Out Time</label>
+            <input type="time" name="OutTime" class="form-control" required />
         </div>
-
-        <div class="form-group mb-3">
-            <label for="AttStatus">Status</label>
-            <select id="AttStatus" name="AttStatus" class="form-control" required>
-                <option value="P">Present</option>
-                <option value="L">Late</option>
-                <option value="A">Absent</option>
-            </select>
-        </div>
-
         <button type="submit" class="btn btn-primary">Create</button>
     </form>
-</div>
-    <div class="container mt-4">
-        <h2>Bulk Attendance (Excel)</h2>
 
-        <!-- Company select -->
-        <div class="mb-3">
-            <label>Select Company</label>
-            <select id="bulkComId" class="form-control">
-                <option value="">--Select Company--</option>
-                @foreach (var company in companies)
-                {
-                    <option value="@company.ComId">@company.ComName</option>
-                }
-            </select>
-        </div>
-        <!-- Download Template -->
-        <button type="button" id="downloadTemplateBtn" class="btn btn-info mb-3">Download Excel Template</button>
-        <!-- Excel Upload Form -->
-        <form id="uploadExcelForm" enctype="multipart/form-data">
-            @Html.AntiForgeryToken()
-            <div class="mb-3">
-                <input type="file" name="file" class="form-control" accept=".xlsx" required />
-            </div>
-            <button type="submit" class="btn btn-success">Upload & Save</button>
-        </form>
-
-        <div id="uploadResult" class="mt-3"></div>
-    </div>
-
-
-    <!-- Attendance List Table -->
-    <table class="table table-bordered">
+    <h3 class="mt-4">Attendance Records</h3>
+    <table class="table table-bordered" id="attendanceTable">
         <thead>
             <tr>
                 <th>Date</th>
@@ -98,12 +53,12 @@
                 <th>Actions</th>
             </tr>
         </thead>
-        <tbody id="attendanceTable">
-            @foreach (var item in Model)
+        <tbody>
+            @foreach(var item in Model)
             {
                 <tr id="row-@item.Id">
                     <td>@item.dtDate.ToString("yyyy-MM-dd")</td>
-                    <td>@item.Employee?.EmpName ?? "N/A"</td>
+                    <td>@(item.Employee != null ? item.Employee.EmpName : "Not Found")</td>
                     <td>@item.AttStatus</td>
                     <td>@item.InTime.ToString("HH:mm")</td>
                     <td>@item.OutTime.ToString("HH:mm")</td>
@@ -117,106 +72,242 @@
     </table>
 </div>
 
+<div class="container mt-4">
+    <h2>Bulk Attendance (Excel)</h2>
+    <form id="uploadExcelForm" enctype="multipart/form-data" method="post">
+        @Html.AntiForgeryToken()
+        <div class="mb-3">
+            <label>Select Company</label>
+            <select id="bulkComId" name="bulkComId" class="form-control" required>
+                <option value="">--Select Company--</option>
+                @foreach(var company in companies)
+                {
+                    <option value="@company.ComId">@company.ComName</option>
+                }
+            </select>
+        </div>
+        <input type="file" id="excelFile" name="file" class="form-control mb-2" accept=".xlsx" required />
+        <button type="submit" class="btn btn-primary mb-2">Upload Excel</button>
+        <button type="button" id="downloadTemplateBtn" class="btn btn-info mb-2">Download Excel Template</button>
+        <div id="uploadResult"></div>
+    </form>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Attendance</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editAttendanceForm" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="editId" />
+                    <div class="form-group mb-3">
+                        <label>Company</label>
+                        <select id="editComId" name="ComId" class="form-control" required>
+                            <option value="">-- Select Company --</option>
+                            @foreach(var company in companies)
+                            {
+                                <option value="@company.ComId">@company.ComName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label>Employee</label>
+                        <select id="editEmpId" name="EmpId" class="form-control" required>
+                            <option value="">-- Select Employee --</option>
+                        </select>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label>Date</label>
+                        <input type="date" name="dtDate" id="editDtDate" class="form-control" required />
+                    </div>
+                    <div class="form-group mb-3">
+                        <label>In Time</label>
+                        <input type="time" name="InTime" id="editInTime" class="form-control" required />
+                    </div>
+                    <div class="form-group mb-3">
+                        <label>Out Time</label>
+                        <input type="time" name="OutTime" id="editOutTime" class="form-control" required />
+                    </div>
+                    <div class="form-group mb-3">
+                        <label>Status</label>
+                        <input type="text" id="editAttStatus" class="form-control" readonly />
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="submitEdit()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
-              $(document).ready(function () {
+    $(document).ready(function() {
+        let empToSelect = null;
 
-            // 🔹 Filter employees by company
-            $("#ComId").change(function () {
-                var comId = $(this).val();
-                var employeeDropdown = $("#EmpId");
-                employeeDropdown.empty();
-                employeeDropdown.append('<option value="">-- Select Employee --</option>');
-
-                if (!comId) return; // কোন company select না করলে
-
-                $.getJSON('/Attendances/GetEmployeesByCompany', { comId: comId }, function (data) {
-                    if (data.length === 0) {
-                        employeeDropdown.append('<option value="">No employees found</option>');
-                        return;
-                    }
-                    $.each(data, function (i, employee) {
-                        employeeDropdown.append('<option value="' + employee.empId + '">' + employee.empName + '</option>');
-                    });
+        $("#ComId").change(function() {
+            var comId = $(this).val();
+            $("#EmpId").html('<option value="">-- Select Employee --</option>');
+            if (!comId) return;
+            $.getJSON('/Attendances/GetEmployeesByCompany?comId=' + comId, function(data) {
+                $.each(data, function(i, emp) {
+                    $("#EmpId").append(`<option value="${emp.empId}">${emp.empName}</option>`);
                 });
-            });
-
-            // 🔹 Submit single attendance
-            $("#createAttendanceForm").submit(function (e) {
-                e.preventDefault();
-                var formData = $(this).serialize();
-
-                $.post('/Attendances/AttendanceCreate', formData, function (response) {
-                    alert(response.message || "Attendance created successfully.");
-                    if (response.success) {
-                        var att = response.attendance;
-
-                        // নতুন row append
-                        $("#attendanceTable").append(`
-                            <tr id="row-${att.id}">
-                                <td>${att.date}</td>
-                                <td>${att.empName}</td>
-                                <td>${att.attStatus}</td>
-                                <td>${att.inTime}</td>
-                                <td>${att.outTime}</td>
-                                <td>
-                                    <button class="btn btn-warning btn-sm" onclick="openEditModal('${att.id}')">Edit</button>
-                                    <button class="btn btn-danger btn-sm" onclick="deleteAttendance('${att.id}')">Delete</button>
-                                </td>
-                            </tr>
-                        `);
-
-                        // ফর্ম reset
-                        $("#createAttendanceForm")[0].reset();
-                        $("#EmpId").empty().append('<option value="">-- Select Employee --</option>'); // Employee dropdown reset
-                    }
-                });
-            });
-
+            }).fail(function() { alert("Error loading employees."); });
         });
 
-            // Load employees for bulk attendance
-                $("#bulkComId").change(function(){
+        $("#editComId").change(function() {
             var comId = $(this).val();
-            var tbody = $("#bulkEmployeeTable tbody");
-            tbody.empty();
-            if(!comId) return;
-
-            $.getJSON(`/Attendances/GetEmployeesByCompany?comId=${comId}`, function(employees){
-                if(!employees.length) {
-                    tbody.append('<tr><td colspan="5">No employees found.</td></tr>');
-                    return;
+            $("#editEmpId").html('<option value="">-- Select Employee --</option>');
+            if (!comId) return;
+            $.getJSON('/Attendances/GetEmployeesByCompany?comId=' + comId, function(data) {
+                $.each(data, function(i, emp) {
+                    $("#editEmpId").append(`<option value="${emp.empId}">${emp.empName}</option>`);
+                });
+                if (empToSelect) {
+                    $("#editEmpId").val(empToSelect);
+                    empToSelect = null;
                 }
-                employees.forEach(emp => {
-                    tbody.append(`
-                        <tr>
-                            <td><input type="checkbox" name="EmpIds" value="${emp.empId}"></td>
-                            <td>${emp.empName}</td>
-                            <td><input type="time" name="InTimes" class="form-control" value="09:00"></td>
-                            <td><input type="time" name="OutTimes" class="form-control" value="17:00"></td>
+            }).fail(function() { alert("Error loading employees."); });
+        });
+
+        $("#createAttendanceForm").submit(function(e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+            $.ajax({
+                url: '/Attendances/AttendanceCreate',
+                type: 'POST',
+                data: formData,
+                contentType: false,
+                processData: false,
+                success: function(res) {
+                    if (!res.success) {
+                        alert(res.message);
+                        return;
+                    }
+                    var att = res.attendance;
+                    $("#attendanceTable tbody").append(`
+                        <tr id="row-${att.id}">
+                            <td>${att.date}</td>
+                            <td>${att.empName}</td>
+                            <td>${att.attStatus}</td>
+                            <td>${att.inTime}</td>
+                            <td>${att.outTime}</td>
                             <td>
-                                <select name="AttStatuses" class="form-control">
-                                    <option value="P">Present</option>
-                                    <option value="L">Late</option>
-                                    <option value="A">Absent</option>
-                                </select>
+                                <button class="btn btn-warning btn-sm" onclick="openEditModal('${att.id}')">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteAttendance('${att.id}')">Delete</button>
                             </td>
                         </tr>
                     `);
-                });
+                    $("#createAttendanceForm")[0].reset();
+                    $("#EmpId").html('<option value="">-- Select Employee --</option>');
+                    alert(res.message);
+                },
+                error: function() { alert("Error creating attendance."); }
             });
         });
 
-                // Download Excel Template
-        $("#downloadTemplateBtn").click(function () {
+        window.deleteAttendance = function(id) {
+            if (!confirm("Are you sure?")) return;
+            $.ajax({
+                url: '/Attendances/Delete',
+                type: 'POST',
+                data: { id: id, __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val() },
+                success: function(res) {
+                    if (res.success) {
+                        $("#row-" + id).remove();
+                        alert(res.message);
+                    } else alert(res.message);
+                },
+                error: function() { alert("Error deleting."); }
+            });
+        };
+
+        window.openEditModal = function(id) {
+            $.getJSON('/Attendances/GetAttendance?id=' + id, function(data) {
+                $('#editId').val(data.id);
+                empToSelect = data.empId;
+                $('#editComId').val(data.comId).trigger('change');
+                $('#editDtDate').val(data.dtDate);
+                $('#editInTime').val(data.inTime);
+                $('#editOutTime').val(data.outTime);
+                $('#editAttStatus').val(data.attStatus);
+                $('#editModal').modal('show');
+            }).fail(function() { alert("Error loading data."); });
+        };
+
+        window.submitEdit = function() {
+            var formData = new FormData($('#editAttendanceForm')[0]);
+            var id = $('#editId').val();
+            $.ajax({
+                url: '/Attendances/AttendanceEdit?id=' + id,
+                type: 'POST',
+                data: formData,
+                contentType: false,
+                processData: false,
+                success: function(res) {
+                    if (!res.success) {
+                        alert(res.message);
+                        return;
+                    }
+                    var att = res.attendance;
+                    var row = $('#row-' + att.id);
+                    row.find('td:nth-child(1)').text(att.date);
+                    row.find('td:nth-child(2)').text(att.empName);
+                    row.find('td:nth-child(3)').text(att.attStatus);
+                    row.find('td:nth-child(4)').text(att.inTime);
+                    row.find('td:nth-child(5)').text(att.outTime);
+                    $('#editModal').modal('hide');
+                    alert(res.message);
+                },
+                error: function() { alert("Error updating."); }
+            });
+        };
+
+        $("#downloadTemplateBtn").click(function() {
             var comId = $("#bulkComId").val();
             if (!comId) {
-                alert("Please select a company first.");
+                alert("Select company first.");
                 return;
             }
             window.location.href = `/Attendances/DownloadAttendanceTemplate?comId=${comId}`;
         });
 
+        $("#uploadExcelForm").submit(function(e) {
+            e.preventDefault();
+            var comId = $("#bulkComId").val();
+            if (!comId) {
+                alert("Select company first.");
+                return;
+            }
+            var formData = new FormData(this);
+            formData.append('bulkComId', comId);
+            $.ajax({
+                url: '/Attendances/UploadExcel',
+                type: 'POST',
+                data: formData,
+                contentType: false,
+                processData: false,
+                success: function(res) {
+                    $("#uploadResult").html(res.success ? 
+                        '<div class="alert alert-success">' + res.message + '</div>' : 
+                        '<div class="alert alert-danger">' + res.message + '</div>');
+                    if (res.success) {
+                        location.reload();
+                    }
+                },
+                error: function() { alert("Error uploading."); }
+            });
+        });
+    });
     </script>
 }

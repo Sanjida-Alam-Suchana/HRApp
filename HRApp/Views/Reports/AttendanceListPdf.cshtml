@@ -11,14 +11,14 @@
         </tr>
     </thead>
     <tbody>
-        @foreach (dynamic item in Model)
+        @foreach (var att in Model)
         {
             <tr>
-                <td>@item.EmployeeName</td>
-                <td>@item.TotalPresent</td>
-                <td>@item.TotalAbsent</td>
-                <td>@item.TotalLate</td>
-                <td>@item.TotalAbsentAgain</td>
+                <td>@att.GetType().GetProperty("EmployeeName").GetValue(att)</td>
+                <td class="text-center"><span class="badge bg-success">@att.GetType().GetProperty("TotalPresent").GetValue(att)</span></td>
+                <td class="text-center"><span class="badge bg-danger">@att.GetType().GetProperty("TotalAbsent").GetValue(att)</span></td>
+                <td class="text-center"><span class="badge bg-warning">@att.GetType().GetProperty("TotalLate").GetValue(att)</span></td>
+                <td class="text-center"><span class="badge bg-danger">@att.GetType().GetProperty("TotalAbsentAgain").GetValue(att)</span></td>
             </tr>
         }
     </tbody>

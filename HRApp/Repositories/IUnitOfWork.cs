@@ -17,8 +17,7 @@ namespace HRApp.Repositories
         IRepository<Attendance> Attendances { get; }
         IRepository<Salary> Salaries { get; }
         IRepository<AttendanceSummary> AttendanceSummaries { get; }
-        IEmployeeRepository Employee { get; }
-        IDepartmentRepository Department { get; }
+       
         DbContext DbContext { get; }
 
         Task ExecRawAsync(string sql, Guid comId, int year, int month);

@@ -3,6 +3,7 @@ using HRApp.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace HRApp.Controllers
@@ -16,93 +17,140 @@ namespace HRApp.Controllers
             _unitOfWork = unitOfWork;
         }
 
-        // GET: Salaries/SalaryIndex
-        // SalaryIndex Action
-        public async Task<IActionResult> SalaryIndex()
+        // GET: Salaries/Index (with filters)
+        public async Task<IActionResult> Index(Guid? comId, int? year, int? month)
         {
             var companies = await _unitOfWork.Companies.GetAllAsync();
             ViewBag.Companies = companies;
 
-            var selectedComId = Request.Cookies["SelectedComId"];
-            var salaries = await _unitOfWork.Salaries.GetQueryable()
-                .Include(s => s.Employee) // Ensure Employee is included
-                .Include(s => s.Company)  // Ensure Company is included
-                .ToListAsync();
-
-            if (!string.IsNullOrEmpty(selectedComId))
+            // Fallback to cookie if no comId param
+            if (!comId.HasValue)
             {
-                salaries = salaries
-                    .Where(s => s.ComId != Guid.Empty && s.ComId.ToString() == selectedComId)
-                    .ToList();
+                var selectedComIdStr = Request.Cookies["SelectedComId"];
+                if (Guid.TryParse(selectedComIdStr, out var cookieComId))
+                {
+                    comId = cookieComId;
+                }
             }
+            ViewBag.SelectedComId = comId;
+            ViewBag.SelectedYear = year;
+            ViewBag.SelectedMonth = month;
+
+            var salaries = await _unitOfWork.Salaries.GetQueryable()
+                .Include(s => s.Employee)
+                .Include(s => s.Company)
+                .Where(s => (!comId.HasValue || s.ComId == comId.Value) &&
+                            (!year.HasValue || s.dtYear == year.Value) &&
+                            (!month.HasValue || s.dtMonth == month.Value))
+                .ToListAsync();
 
             return View(salaries);
         }
 
-        // GET: Salaries/Calculate
-        public async Task<IActionResult> Calculate()
-        {
-            ViewBag.Companies = await _unitOfWork.Companies.GetAllAsync();
-            return View();
-        }
-
-        // POST: Salaries/Calculate
-        // Calculate POST
+        // POST: Salaries/Generate
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Calculate(Guid comId, int dtYear, int dtMonth)
+        public async Task<IActionResult> Generate(Guid comId, int year, int month)
         {
             try
             {
-                await _unitOfWork.ExecRawAsync("CALL \"CalculateSalary\"({0}, {1}, {2})", comId, dtYear, dtMonth);
-                return Json(new { success = true, message = "Salary generated!" });
+                Console.WriteLine($"Generate called: ComId={comId}, Year={year}, Month={month}");
+
+                if (comId == Guid.Empty)
+                {
+                    return Json(new { success = false, message = "Please select a company." });
+                }
+
+                // Check employees
+                var employeeCount = await _unitOfWork.Employees.GetQueryable()
+                    .CountAsync(e => e.ComId == comId && e.Basic > 0);
+                Console.WriteLine($"Valid employees (with Basic > 0): {employeeCount}");
+
+                if (employeeCount == 0)
+                {
+                    return Json(new { success = false, message = "No employees with valid salary data found for the selected company." });
+                }
+
+                // Check attendance summary
+                var summaryCount = await _unitOfWork.AttendanceSummaries.GetQueryable()
+                    .CountAsync(a => a.ComId == comId &&
+                                   a.SummaryMonth.Year == year &&
+                                   a.SummaryMonth.Month == month);
+                Console.WriteLine($"Attendance summaries: {summaryCount}");
+
+                if (summaryCount == 0)
+                {
+                    return Json(new { success = false, message = "Please generate Attendance Summary first for this company and month." });
+                }
+
+                // Check existing salaries
+                var existingCount = await _unitOfWork.Salaries.GetQueryable()
+                    .CountAsync(s => s.ComId == comId && s.dtYear == year && s.dtMonth == month);
+
+                if (existingCount > 0)
+                {
+                    return Json(new { success = false, message = $"Salaries already exist ({existingCount} records). Delete them first if you want to regenerate." });
+                }
+
+                // Call procedure
+                Console.WriteLine("Calling CalculateSalary procedure...");
+                await _unitOfWork.ExecRawAsync("CALL \"CalculateSalary\"(@p0, @p1, @p2)", comId, year, month);
+                Console.WriteLine("Procedure call completed");
+
+                // Verify results
+                var insertedCount = await _unitOfWork.Salaries.GetQueryable()
+                    .CountAsync(s => s.ComId == comId && s.dtYear == year && s.dtMonth == month);
+                Console.WriteLine($"Salaries after procedure: {insertedCount}");
+
+                if (insertedCount == 0)
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        message = "Procedure completed but no records were inserted. Check database logs for details."
+                    });
+                }
+
+                return Json(new
+                {
+                    success = true,
+                    message = $"Salaries generated successfully! {insertedCount} records created."
+                });
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = ex.Message });
+                Console.WriteLine($"Generate error: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
-
-        // GET: Salaries/SalaryCreate
-        public async Task<IActionResult> SalaryCreate()
+        // GET: GetEmployeesByCompany for AJAX (if needed for edits)
+        [HttpGet]
+        public async Task<IActionResult> GetEmployeesByCompany(Guid comId)
         {
-            ViewBag.Companies = await _unitOfWork.Companies.GetAllAsync();
-            ViewBag.Employees = await _unitOfWork.Employees.GetAllAsync(); // Ensure this is populated
-            return View();
+            var employees = await _unitOfWork.Employees.GetQueryable()
+                .Where(e => e.ComId == comId)
+                .Select(e => new { EmpId = e.EmpId.ToString(), EmpName = e.EmpName })
+                .ToListAsync();
+
+            return Json(employees);
         }
 
-        // POST: Salaries/SalaryCreate
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SalaryCreate(Salary salary)
-        {
-            if (!ModelState.IsValid)
-            {
-                ViewBag.Companies = await _unitOfWork.Companies.GetAllAsync();
-                ViewBag.Employees = await _unitOfWork.Employees.GetAllAsync();
-                return View(salary);
-            }
-
-            salary.SalaryId = Guid.NewGuid();
-            await _unitOfWork.Salaries.AddAsync(salary);
-            await _unitOfWork.SaveAsync();
-            return Json(new { success = true, message = "Salary created successfully!" });
-        }
-
-        // GET: Salaries/SalaryEdit/{id}
-        public async Task<IActionResult> SalaryEdit(Guid id)
+        // GET: Salaries/Edit/{id}
+        public async Task<IActionResult> Edit(Guid id)
         {
             var salary = await _unitOfWork.Salaries.GetAsync(id);
             if (salary == null) return NotFound();
+
             ViewBag.Companies = await _unitOfWork.Companies.GetAllAsync();
-            ViewBag.Employees = await _unitOfWork.Employees.GetAllAsync(); // Ensure this is populated
+            ViewBag.Employees = await _unitOfWork.Employees.GetAllAsync();
             return View(salary);
         }
 
-        // POST: Salaries/SalaryEdit/{id}
+        // POST: Salaries/Edit/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SalaryEdit(Guid id, Salary salary)
+        public async Task<IActionResult> Edit(Guid id, Salary salary)
         {
             if (id != salary.SalaryId)
                 return Json(new { success = false, message = "Invalid salary ID." });
@@ -111,20 +159,42 @@ namespace HRApp.Controllers
             if (existingSalary == null)
                 return Json(new { success = false, message = "Salary not found." });
 
+            // Update fields (avoid updating calculated fields if not needed)
             existingSalary.EmpId = salary.EmpId;
             existingSalary.ComId = salary.ComId;
             existingSalary.dtYear = salary.dtYear;
             existingSalary.dtMonth = salary.dtMonth;
+            existingSalary.Gross = salary.Gross;
             existingSalary.Basic = salary.Basic;
             existingSalary.HRent = salary.HRent;
             existingSalary.Medical = salary.Medical;
-            existingSalary.Gross = salary.Gross;
             existingSalary.AbsentDays = salary.AbsentDays;
+            existingSalary.AbsentAmount = salary.AbsentAmount;
+            existingSalary.PayableAmount = salary.PayableAmount;
             existingSalary.IsPaid = salary.IsPaid;
             existingSalary.PaidAmount = salary.PaidAmount;
 
             await _unitOfWork.SaveAsync();
             return Json(new { success = true, message = "Salary updated successfully!" });
+        }
+
+        // POST: Salaries/MarkAsPaid/{id} (New: For clicking button in list to pay)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MarkAsPaid(Guid id)
+        {
+            var salary = await _unitOfWork.Salaries.GetAsync(id);
+            if (salary == null)
+                return Json(new { success = false, message = "Salary not found." });
+
+            if (salary.IsPaid)
+                return Json(new { success = false, message = "Salary already paid." });
+
+            salary.IsPaid = true;
+            salary.PaidAmount = salary.PayableAmount;  // Assume full payment
+
+            await _unitOfWork.SaveAsync();
+            return Json(new { success = true, message = "Salary marked as paid!" });
         }
 
         // POST: Salaries/Delete/{id}
@@ -141,26 +211,5 @@ namespace HRApp.Controllers
 
             return Json(new { success = true, message = "Salary deleted successfully!" });
         }
-        // POST: Salaries/Pay/{id}
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Pay(Guid id)
-        {
-            var salary = await _unitOfWork.Salaries.GetAsync(id);
-            if (salary == null)
-                return Json(new { success = false, message = "Salary not found." });
-
-            if (salary.IsPaid)
-                return Json(new { success = false, message = "Salary is already paid." });
-
-           
-            salary.IsPaid = true;
-            salary.PaidAmount = salary.PayableAmount;
-
-            await _unitOfWork.SaveAsync();
-
-            return Json(new { success = true, message = "Salary paid successfully!" });
-        }
-
     }
 }

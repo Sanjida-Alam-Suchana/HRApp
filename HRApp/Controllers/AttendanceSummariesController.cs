@@ -1,10 +1,11 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using HRApp.Models;
+﻿using HRApp.Models;
 using HRApp.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
+using System.Globalization;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace HRApp.Controllers
 {
@@ -15,6 +16,22 @@ namespace HRApp.Controllers
         public AttendanceSummariesController(IUnitOfWork unitOfWork)
         {
             _unitOfWork = unitOfWork;
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CalculateAttendanceSummary(Guid comId, int dtYear, int dtMonth)
+        {
+            try
+            {
+                await _unitOfWork.ExecRawAsync("CALL \"CalculateAttendanceSummary\"({0}, {1}, {2})", comId, dtYear, dtMonth);
+                return Json(new { success = true, message = "Attendance summary generated!" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in CalculateAttendanceSummary: {ex}");
+                return Json(new { success = false, message = ex.Message });
+            }
         }
 
         // GET: AttendanceSummaries/AttendanceSummaryIndex
@@ -39,34 +56,25 @@ namespace HRApp.Controllers
             return View(summaries);
         }
 
-        // GET: AttendanceSummaries/AttendanceSummaryGenerate
-        public async Task<IActionResult> AttendanceSummaryGenerate()
-        {
-            ViewBag.Companies = await _unitOfWork.Companies.GetAllAsync();
-            ViewBag.Employees = await _unitOfWork.Employees.GetAllAsync();
-            return View();
-        }
-
-        // POST: AttendanceSummaries/AttendanceSummaryGenerate
+        // POST: AttendanceSummaries/AttendanceSummaryGenerate (Consolidated method, handles string inputs, checks duplicates)
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AttendanceSummaryGenerate(AttendanceSummary summary)
+        public async Task<IActionResult> AttendanceSummaryGenerate(string ComId, string SummaryMonth)
         {
-            if (summary.ComId == Guid.Empty)
+            if (!Guid.TryParse(ComId, out var comId) || comId == Guid.Empty)
             {
                 return Json(new { success = false, message = "Please select a company." });
             }
-
-            if (summary.SummaryMonth == default)
+            if (!DateTime.TryParseExact(SummaryMonth, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var summaryDate))
             {
-                return Json(new { success = false, message = "Please select a month and year." });
+                return Json(new { success = false, message = "Invalid month format." });
             }
 
             // Check duplicate
             var existingSummaries = await _unitOfWork.AttendanceSummaries.GetQueryable()
-                .Where(s => s.ComId == summary.ComId
-                         && s.SummaryMonth.Year == summary.SummaryMonth.Year
-                         && s.SummaryMonth.Month == summary.SummaryMonth.Month)
+                .Where(s => s.ComId == comId
+                         && s.SummaryMonth.Year == summaryDate.Year
+                         && s.SummaryMonth.Month == summaryDate.Month)
                 .ToListAsync();
 
             if (existingSummaries.Any())
@@ -74,32 +82,16 @@ namespace HRApp.Controllers
                 return Json(new { success = false, message = "Summary already exists for the selected company and month." });
             }
 
-            var employees = await _unitOfWork.Employees.GetQueryable()
-                .Where(e => e.ComId == summary.ComId)
-                .ToListAsync();
-
-            var totalDays = DateTime.DaysInMonth(summary.SummaryMonth.Year, summary.SummaryMonth.Month);
-
-            foreach (var employee in employees)
+            try
             {
-                var newSummary = new AttendanceSummary
-                {
-                    SummaryId = Guid.NewGuid(),
-                    EmpId = employee.EmpId,
-                    ComId = summary.ComId,
-                    SummaryMonth = DateTime.SpecifyKind(new DateTime(summary.SummaryMonth.Year, summary.SummaryMonth.Month, 1), DateTimeKind.Utc),
-                    TotalDays = totalDays,
-                    DaysPresent = 20, // TODO: Replace with actual attendance logic
-                    DaysAbsent = totalDays - 20, // Placeholder calculation
-                    DaysLate = 2,
-                    Remarks = "Generated automatically for " + summary.SummaryMonth.ToString("MMMM yyyy")
-                };
-
-                await _unitOfWork.AttendanceSummaries.AddAsync(newSummary);
+                await _unitOfWork.ExecRawAsync("CALL \"CalculateAttendanceSummary\"({0}, {1}, {2})", comId, summaryDate.Year, summaryDate.Month);
+                return Json(new { success = true, message = $"Attendance summaries generated successfully!" });
             }
-
-            await _unitOfWork.SaveAsync();
-            return Json(new { success = true, message = $"Attendance summaries generated successfully for {employees.Count} employees!" });
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error generating summary: {ex}");
+                return Json(new { success = false, message = ex.Message });
+            }
         }
 
         // GET: GetEmployeesByCompany for AJAX

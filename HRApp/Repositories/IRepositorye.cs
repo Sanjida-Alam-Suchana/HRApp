@@ -63,6 +63,8 @@ namespace HRApp.Repositories
         /// </summary>
         IQueryable<T> GetQueryable();
         Task ExecuteSqlRawAsync(string sql, params object[] parameters);
-        //Task AddRangeAsync(List<Attendance> attendances);
+
+        Task<IEnumerable<Salary>> GetSalariesByCompanyMonthYearAsync(Guid comId, int dtYear, int dtMonth);
+        Task CalculateSalaryAsync(Guid comId, int dtYear, int dtMonth);
     }
 }

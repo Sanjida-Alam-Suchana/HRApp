@@ -2,7 +2,9 @@ using HRApp.Data;
 using HRApp.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Rotativa.AspNetCore;
+using OfficeOpenXml;
 
+ExcelPackage.License.SetNonCommercialPersonal("Sanjida Alam");
 
 var builder = WebApplication.CreateBuilder(args);
 

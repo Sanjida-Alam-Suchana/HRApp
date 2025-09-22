@@ -1,10 +1,11 @@
-﻿using System;
+﻿using HRApp.Data;
+using HRApp.Models;
+using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
-using HRApp.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace HRApp.Repositories
 {
@@ -46,7 +47,6 @@ namespace HRApp.Repositories
             IQueryable<T> query = _dbSet;
             foreach (var includeProperty in includeProperties)
                 query = query.Include(includeProperty);
-
             return await query.FirstOrDefaultAsync(e => EF.Property<Guid>(e, "Id") == id);
         }
 
@@ -79,24 +79,42 @@ namespace HRApp.Repositories
         {
             return await _dbSet.Where(predicate).ToListAsync();
         }
+
         public IQueryable<T> GetQueryable()
         {
             return _dbSet.AsQueryable();
         }
+
         public async Task ExecuteSqlRawAsync(string sql, params object[] parameters)
         {
             await _context.Database.ExecuteSqlRawAsync(sql, parameters);
         }
+
         public async Task<T> GetByIdAsync(Guid id)
         {
             return await _context.Set<T>().FindAsync(id);
         }
+
         public async Task AddRangeAsync(IEnumerable<T> entities)
         {
             await _dbSet.AddRangeAsync(entities);
         }
 
+        public async Task<IEnumerable<Salary>> GetSalariesByCompanyMonthYearAsync(Guid comId, int dtYear, int dtMonth)
+        {
+            return await _context.Salaries
+                .Where(s => s.ComId == comId && s.dtYear == dtYear && s.dtMonth == dtMonth)
+                .Include(s => s.Employee)
+                .ToListAsync();
+        }
 
-
+        
+        public async Task CalculateSalaryAsync(Guid comId, int dtYear, int dtMonth)
+        {
+            await _context.Database.ExecuteSqlRawAsync(
+                "CALL CalculateSalary({0}, {1}, {2})",
+                comId, dtYear, dtMonth
+            );
+        }
     }
 }

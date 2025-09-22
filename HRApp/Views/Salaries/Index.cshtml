@@ -1,0 +1,240 @@
+﻿@model IEnumerable<HRApp.Models.Salary>
+
+@{
+    ViewData["Title"] = "Salary List";
+    var selectedComId = ViewBag.SelectedComId as Guid?;
+    var selectedYear = ViewBag.SelectedYear as int? ?? DateTime.Now.Year;
+    var selectedMonth = ViewBag.SelectedMonth as int? ?? DateTime.Now.Month;
+}
+
+<h1>Salary List</h1>
+
+<!-- Form for Filter (GET) and Generate (AJAX POST) -->
+<form asp-action="Index" method="get" id="salaryForm">
+    @Html.AntiForgeryToken()
+    <div class="form-row">
+        <div class="form-group col-md-4">
+            <label>Select Company <span class="text-danger">*</span></label>
+            <select name="comId" class="form-control" required>
+                <option value="">Select Company</option>
+                @foreach (var company in ViewBag.Companies)
+                {
+                    <option value="@company.ComId" selected="@(selectedComId.HasValue && company.ComId == selectedComId.Value)">@company.ComName</option>
+                }
+            </select>
+        </div>
+        <div class="form-group col-md-3">
+            <label>Select Year <span class="text-danger">*</span></label>
+            <select name="year" class="form-control" required>
+                @for (int y = DateTime.Now.Year - 5; y <= DateTime.Now.Year + 5; y++)
+                {
+                    <option value="@y" selected="@(y == selectedYear)">@y</option>
+                }
+            </select>
+        </div>
+        <div class="form-group col-md-3">
+            <label>Select Month <span class="text-danger">*</span></label>
+            <select name="month" class="form-control" required>
+                @for (int m = 1; m <= 12; m++)
+                {
+                    <option value="@m" selected="@(m == selectedMonth)">@(m.ToString("D2"))</option>
+                }
+            </select>
+        </div>
+        <div class="form-group col-md-2">
+            <br />
+            <button type="submit" id="filterBtn" class="btn btn-primary btn-block">Filter</button>
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="col-md-12">
+            <button type="button" id="generateBtn" class="btn btn-success">Generate Salary</button>
+            <span id="generateStatus" class="ml-3" style="display:none;">Ready</span>
+        </div>
+    </div>
+</form>
+
+<hr />
+
+<!-- Salary List Table -->
+<div class="table-responsive">
+    <table class="table table-striped" id="salaryTable">
+        <thead class="thead-dark">
+            <tr>
+                <th>Employee Name</th>
+                <th>Year-Month</th>
+                <th>Gross</th>
+                <th>Basic</th>
+                <th>HRent</th>
+                <th>Medical</th>
+                <th>Absent Days</th>
+                <th>Absent Amount</th>
+                <th>Payable Amount</th>
+                <th>Paid Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr>
+                    <td colspan="12" class="text-center text-muted py-4">
+                        No salaries found. Generate some or adjust filters.
+                    </td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td>@item.Employee?.EmpName</td>
+                        <td>@item.SalaryMonth</td>
+                        <td>@item.Gross</td>
+                        <td>@item.Basic</td>
+                        <td>@item.HRent</td>
+                        <td>@item.Medical</td>
+                        <td>@item.AbsentDays</td>
+                        <td>@item.AbsentAmount</td>
+                        <td>@item.PayableAmount</td>
+                        <td>@item.PaidAmount</td>
+                        <td>
+                            @(item.IsPaid ? "Paid" : "Unpaid")
+                        </td>
+                        <td>
+                            <a asp-action="Edit" asp-route-id="@item.SalaryId">Edit</a> |
+                            <button class="payBtn" data-id="@item.SalaryId">Pay</button> |
+                            <button class="deleteBtn" data-id="@item.SalaryId">Delete</button>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+
+       @section Scripts {
+    <script>
+        $(document).ready(function() {
+            console.log('Script loaded - jQuery ready');
+
+            // Get the anti-forgery token once
+            var token = $('input[name="__RequestVerificationToken"]').val();
+            if (!token) {
+                console.error('Anti-forgery token not found!');
+            }
+
+            // AJAX for Generate Salary
+            $('#generateBtn').click(function (e) {
+                e.preventDefault(); // Prevent any default behavior
+                console.log('Generate button clicked');
+
+                var comId = $('select[name="comId"]').val();
+                var year = parseInt($('select[name="year"]').val());
+                var month = parseInt($('select[name="month"]').val());
+
+                console.log('Form values:', { comId, year, month });
+
+                if (!comId || isNaN(year) || isNaN(month)) {
+                    alert('Please select Company, Year, and Month.');
+                    return;
+                }
+
+                // Disable button during request
+                var $btn = $(this);
+                $btn.prop('disabled', true).text('Generating...');
+
+                $.ajax({
+                    url: '/Salaries/Generate',
+                    type: 'POST',
+                    data: { 
+                        comId: comId, 
+                        year: year, 
+                        month: month 
+                    },
+                    headers: {
+                        'RequestVerificationToken': token  // Add the token here
+                    },
+                    success: function (response) {
+                        console.log('Success:', response);
+                        alert(response.message);
+                        if (response.success) {
+                            location.reload();  // Reload to show updated list
+                        }
+                    },
+                    error: function (xhr, status, error) {
+                        console.error('AJAX Error:', { status, error, response: xhr.responseText });
+                        var msg = 'Unknown error';
+                        if (xhr.status === 400) {
+                            msg = 'Bad Request - Check console for details (likely token or data issue).';
+                        } else if (xhr.responseJSON && xhr.responseJSON.message) {
+                            msg = xhr.responseJSON.message;
+                        }
+                        alert('Error: ' + msg);
+                    },
+                    complete: function () {
+                        $btn.prop('disabled', false).text('Generate Salary');
+                    }
+                });
+            });
+
+            // Filter button - Just submit the form (GET, no token needed)
+            $('#filterBtn').click(function (e) {
+                e.preventDefault();
+                console.log('Filter button clicked');
+                $('#salaryForm').submit();  // This reloads with query params
+            });
+
+            // AJAX for Pay (if data exists)
+            $(document).on('click', '.payBtn', function () {
+                var id = $(this).data('id');
+                if (!id) return;
+                
+                if (!confirm('Mark this salary as paid?')) return;
+
+                $.ajax({
+                    url: '/Salaries/MarkAsPaid/' + id,
+                    type: 'POST',
+                    headers: {
+                        'RequestVerificationToken': token
+                    },
+                    success: function (response) {
+                        alert(response.message);
+                        if (response.success) {
+                            location.reload();
+                        }
+                    },
+                    error: function (xhr) {
+                        alert('Error: ' + (xhr.responseJSON?.message || 'Failed to mark as paid'));
+                    }
+                });
+            });
+
+            // AJAX for Delete
+            $(document).on('click', '.deleteBtn', function () {
+                var id = $(this).data('id');
+                if (!id || !confirm('Are you sure you want to delete?')) return;
+
+                $.ajax({
+                    url: '/Salaries/Delete',
+                    type: 'POST',
+                    data: { id: id },
+                    headers: {
+                        'RequestVerificationToken': token
+                    },
+                    success: function (response) {
+                        alert(response.message);
+                        if (response.success) {
+                            location.reload();
+                        }
+                    },
+                    error: function (xhr) {
+                        alert('Error: ' + (xhr.responseJSON?.message || 'Failed to delete'));
+                    }
+                });
+            });
+        });
+    </script>
+}

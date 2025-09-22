@@ -1,4 +1,5 @@
-﻿@model IEnumerable<HRApp.Models.AttendanceSummary>
+﻿<!-- AttendanceSummaryIndex.cshtml (Added full edit modal code assuming truncated part, updated error handler for debugging) -->
+@model IEnumerable<HRApp.Models.AttendanceSummary>
 @using HRApp.Models
 @{
     ViewData["Title"] = "Attendance Summary List";
@@ -97,7 +98,7 @@
     </div>
 </div>
 
-<!-- Edit Modal -->
+<!-- Edit Modal (Full code, assuming truncated part was for DaysPresent, DaysAbsent, DaysLate, Remarks) -->
 <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -221,21 +222,31 @@
             $("#generateForm").submit(function (e) {
                 e.preventDefault();
                 if ($(this).valid()) {
+                    var comId = $("#genComId").val();
+                    var summaryMonth = $("#genSummaryMonth").val(); // yyyy-MM format
+                    
                     $.ajax({
                         url: '/AttendanceSummaries/AttendanceSummaryGenerate',
                         type: 'POST',
-                        data: $(this).serialize(),
-                        headers: {
-                            "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').val()
+                        data: {
+                            __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val(),
+                            ComId: comId,
+                            SummaryMonth: summaryMonth
                         },
                         success: function (response) {
                             alert(response.message);
                             if (response.success) {
                                 $('#generateModal').modal('hide');
-                                location.reload(); // Refresh the list
+                                location.reload();
                             }
                         },
-                        error: function (xhr) {
+                        error: function (xhr, status, error) {
+                            console.log("AJAX Error:", {
+                                status: status,
+                                error: error,
+                                responseText: xhr.responseText,
+                                responseJSON: xhr.responseJSON
+                            });
                             alert("Failed to generate summary: " + (xhr.responseJSON?.message || "Unknown error"));
                         }
                     });
@@ -285,14 +296,20 @@
                                 location.reload(); // Refresh the list
                             }
                         },
-                        error: function (xhr) {
+                        error: function (xhr, status, error) {
+                            console.log("AJAX Error:", {
+                                status: status,
+                                error: error,
+                                responseText: xhr.responseText,
+                                responseJSON: xhr.responseJSON
+                            });
                             alert("Failed to update summary: " + (xhr.responseJSON?.message || "Unknown error"));
                         }
                     });
                 }
             });
 
-            // Edit Modal Population
+            // Edit Modal Population (Added AJAX to populate employees based on ComId)
             $('.edit-btn').click(function () {
                 var row = $(this).closest('tr');
                 var summaryId = row.data('summaryid');
@@ -302,8 +319,22 @@
                 $('#editSummaryId').val(summaryId);
                 $('#editComId').val(comId);
 
-                // You'll need to populate other fields via AJAX or from data attributes
-                // For now, showing a placeholder
+                // Populate employees via AJAX
+                $.ajax({
+                    url: '/AttendanceSummaries/GetEmployeesByCompany?comId=' + comId,
+                    type: 'GET',
+                    success: function (employees) {
+                        $('#editEmpId').empty();
+                        $('#editEmpId').append('<option value="">Select Employee</option>');
+                        $.each(employees, function (i, emp) {
+                            $('#editEmpId').append('<option value="' + emp.empId + '">' + emp.empName + '</option>');
+                        });
+                    }
+                });
+
+                // Populate other fields (assuming you add data attributes to the row for population)
+                // Example: $('#editSummaryMonth').val(row.find('td:eq(2)').text());
+
                 $('#editModal').modal('show');
             });
 
