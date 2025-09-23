@@ -42,6 +42,16 @@
     </form>
 
     <h3 class="mt-4">Attendance Records</h3>
+    <div class="mb-3">
+        <label>Filter by Company</label>
+        <select id="companyDropdown" class="form-select w-50">
+            <option value="">All Companies</option>
+            @foreach(var company in companies)
+            {
+                <option value="@company.ComId">@company.ComName</option>
+            }
+        </select>
+    </div>
     <table class="table table-bordered" id="attendanceTable">
         <thead>
             <tr>
@@ -53,10 +63,10 @@
                 <th>Actions</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="attendanceTableBody">
             @foreach(var item in Model)
             {
-                <tr id="row-@item.Id">
+                <tr id="row-@item.Id" data-comid="@item.ComId">
                     <td>@item.dtDate.ToString("yyyy-MM-dd")</td>
                     <td>@(item.Employee != null ? item.Employee.EmpName : "Not Found")</td>
                     <td>@item.AttStatus</td>
@@ -148,6 +158,58 @@
     $(document).ready(function() {
         let empToSelect = null;
 
+        // Escape HTML function
+        function escapeHtml(str) {
+            if (typeof str !== 'string') return '';
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Company filter for attendance records
+        $("#companyDropdown").change(function() {
+            let comId = $(this).val();
+            console.log("Selected comId:", comId);
+            $("#attendanceTableBody").empty();
+            let url = comId ? '/Attendances/GetAttendancesByCompany?comId=' + comId : '/Attendances/GetAllAttendances';
+            console.log("Fetching attendances from:", url);
+            $.getJSON(url, function(data) {
+                console.log("Filter response:", data);
+                if (data.length === 0 || (data.success === false)) {
+                    $("#attendanceTableBody").html('<tr><td colspan="6"></td></tr>');
+                    return;
+                }
+                $.each(data, function(i, att) {
+                    let row = `
+                        <tr id="row-${att.id}" data-comid="${att.comId}">
+                            <td>${att.date}</td>
+                            <td>${escapeHtml(att.empName)}</td>
+                            <td>${att.attStatus}</td>
+                            <td>${att.inTime}</td>
+                            <td>${att.outTime}</td>
+                            <td>
+                                <button class="btn btn-warning btn-sm" onclick="openEditModal('${att.id}')">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteAttendance('${att.id}')">Delete</button>
+                            </td>
+                        </tr>`;
+                    $("#attendanceTableBody").append(row);
+                });
+            }).fail(function(xhr, status, error) {
+                console.error("Filter error:", {
+                    status: xhr.status,
+                    statusText: xhr.statusText,
+                    responseText: xhr.responseText,
+                    error: error,
+                    url: url
+                });
+                $("#attendanceTableBody").html('<tr><td colspan="6">Error loading attendance records. Check server status.</td></tr>');
+                alert("Failed to filter attendance records: " + (xhr.responseJSON?.message || "Network error or server unavailable."));
+            });
+        });
+
         $("#ComId").change(function() {
             var comId = $(this).val();
             $("#EmpId").html('<option value="">-- Select Employee --</option>');
@@ -189,10 +251,10 @@
                         return;
                     }
                     var att = res.attendance;
-                    $("#attendanceTable tbody").append(`
-                        <tr id="row-${att.id}">
+                    $("#attendanceTableBody").append(`
+                        <tr id="row-${att.id}" data-comid="${att.comId}">
                             <td>${att.date}</td>
-                            <td>${att.empName}</td>
+                            <td>${escapeHtml(att.empName)}</td>
                             <td>${att.attStatus}</td>
                             <td>${att.inTime}</td>
                             <td>${att.outTime}</td>
@@ -256,10 +318,11 @@
                     var att = res.attendance;
                     var row = $('#row-' + att.id);
                     row.find('td:nth-child(1)').text(att.date);
-                    row.find('td:nth-child(2)').text(att.empName);
+                    row.find('td:nth-child(2)').text(escapeHtml(att.empName));
                     row.find('td:nth-child(3)').text(att.attStatus);
                     row.find('td:nth-child(4)').text(att.inTime);
                     row.find('td:nth-child(5)').text(att.outTime);
+                    row.attr('data-comid', att.comId);
                     $('#editModal').modal('hide');
                     alert(res.message);
                 },

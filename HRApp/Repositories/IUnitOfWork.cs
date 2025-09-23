@@ -25,6 +25,7 @@ namespace HRApp.Repositories
 
         Task<IEnumerable<T>> ExecuteStoredProcedure<T>(string storedProcedureName, object parameters) where T : class;
         IQueryable<Employee> GetEmployeeQueryable();
+
        
     }
 }

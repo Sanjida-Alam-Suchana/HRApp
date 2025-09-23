@@ -9,58 +9,48 @@ namespace HRApp.Repositories
 {
     public interface IRepository<T> where T : class
     {
-        /// <summary>
-        /// Get all entities optionally filtered by a predicate.
-        /// </summary>
+        // Synchronous method for IQueryable
+        IQueryable<T> GetAll();
+
+        // Get all entities optionally filtered by a predicate.
+
         Task<IEnumerable<T>> GetAllAsync(Expression<Func<T, bool>>? filter = null);
+      
+        // Get a single entity by its primary key.
 
-        /// <summary>
-        /// Get a single entity by its primary key.
-        /// </summary>
         Task<T?> GetAsync(Guid id);
-
-        /// <summary>
-        /// Get all entities including navigation properties, optionally filtered.
-        /// </summary>
+        // Get all entities including navigation properties, optionally filtered.
         Task<IEnumerable<T>> GetAllWithIncludeAsync(
             Expression<Func<T, bool>>? filter = null,
             params string[] includeProperties
         );
 
-        /// <summary>
-        /// Get a single entity by id including navigation properties.
-        /// </summary>
+        // Get a single entity by id including navigation properties.
+
         Task<T?> GetWithIncludeAsync(Guid id, params string[] includeProperties);
         Task<T> GetByIdAsync(Guid id);
-        /// <summary>
-        /// Add a new entity.
-        /// </summary>
+
+        
         Task AddAsync(T entity);
         Task AddRangeAsync(IEnumerable<T> entities);
 
-        /// <summary>
-        /// Update an existing entity.
-        /// </summary>
+        // Update an existing entity.
+
         Task UpdateAsync(T entity);
 
-        /// <summary>
-        /// Delete an entity by its primary key.
-        /// </summary>
+        // Delete an entity by its primary key.
         Task DeleteAsync(Guid id);
 
-        /// <summary>
-        /// Save changes to the database.
-        /// </summary>
+        // Save changes to the database.
+
         Task SaveAsync();
 
-        /// <summary>
-        /// Find entities matching a given predicate.
-        /// </summary>
+        // Find entities matching a given predicate.
+
         Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate);
 
-        /// <summary>
-        /// Return IQueryable for advanced querying (with Include support).
-        /// </summary>
+        // Return IQueryable for advanced querying (with Include support).
+
         IQueryable<T> GetQueryable();
         Task ExecuteSqlRawAsync(string sql, params object[] parameters);
 

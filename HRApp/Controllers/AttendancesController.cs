@@ -168,6 +168,41 @@ namespace HRApp.Controllers
             });
         }
 
+        [HttpGet]
+        public async Task<IActionResult> GetAttendancesByCompany(Guid comId)
+        {
+            try
+            {
+                Console.WriteLine($"Fetching attendances for ComId {comId} at {DateTime.Now}");
+                var attendances = _unitOfWork.Attendances.GetQueryable()
+                    .Include(a => a.Employee)
+                    .Include(a => a.Company)
+                    .Where(a => a.ComId == comId);
+
+                var result = await attendances.Select(a => new
+                {
+                    id = a.Id,
+                    comId = a.ComId,
+                    empName = a.Employee != null ? a.Employee.EmpName : "Not Found",
+                    date = a.dtDate.ToString("yyyy-MM-dd"),
+                    inTime = a.InTime.ToString("HH:mm"),
+                    outTime = a.OutTime.ToString("HH:mm"),
+                    attStatus = a.AttStatus
+                }).ToListAsync();
+
+                if (!result.Any())
+                    Console.WriteLine("No attendance records found for this company.");
+
+                return Json(result);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetAttendancesByCompany: {ex}");
+                return Json(new { success = false, message = "Server error: " + ex.Message });
+            }
+        }
+
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UploadExcel(Guid bulkComId, IFormFile file)

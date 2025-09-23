@@ -9,14 +9,14 @@
 
 <h1>Salary List</h1>
 
-<!-- Form for Filter (GET) and Generate (AJAX POST) -->
-<form asp-action="Index" method="get" id="salaryForm">
-    @Html.AntiForgeryToken()
+<!-- Form for Filter (AJAX) and Generate (AJAX POST) -->
+<form id="salaryForm">
+    @Html.AntiForgeryToken()                           
     <div class="form-row">
         <div class="form-group col-md-4">
             <label>Select Company <span class="text-danger">*</span></label>
-            <select name="comId" class="form-control" required>
-                <option value="">Select Company</option>
+            <select name="comId" id="companyDropdown" class="form-control" required>
+                <option value="">All Companies</option>
                 @foreach (var company in ViewBag.Companies)
                 {
                     <option value="@company.ComId" selected="@(selectedComId.HasValue && company.ComId == selectedComId.Value)">@company.ComName</option>
@@ -25,7 +25,7 @@
         </div>
         <div class="form-group col-md-3">
             <label>Select Year <span class="text-danger">*</span></label>
-            <select name="year" class="form-control" required>
+            <select name="year" id="yearDropdown" class="form-control" required>
                 @for (int y = DateTime.Now.Year - 5; y <= DateTime.Now.Year + 5; y++)
                 {
                     <option value="@y" selected="@(y == selectedYear)">@y</option>
@@ -34,7 +34,7 @@
         </div>
         <div class="form-group col-md-3">
             <label>Select Month <span class="text-danger">*</span></label>
-            <select name="month" class="form-control" required>
+            <select name="month" id="monthDropdown" class="form-control" required>
                 @for (int m = 1; m <= 12; m++)
                 {
                     <option value="@m" selected="@(m == selectedMonth)">@(m.ToString("D2"))</option>
@@ -43,7 +43,7 @@
         </div>
         <div class="form-group col-md-2">
             <br />
-           @*  <button type="submit" id="filterBtn" class="btn btn-primary btn-block">Filter</button> *@
+            <button type="button" id="filterBtn" class="btn btn-primary btn-block">Filter</button>
         </div>
     </div>
     <div class="form-row">
@@ -75,7 +75,7 @@
                 <th>Actions</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="salaryTableBody">
             @if (!Model.Any())
             {
                 <tr>
@@ -88,8 +88,8 @@
             {
                 @foreach (var item in Model)
                 {
-                    <tr>
-                        <td>@item.Employee?.EmpName</td>
+                    <tr id="row-@item.SalaryId" data-comid="@item.ComId">
+                        <td>@(item.Employee?.EmpName ?? "Not Found")</td>
                         <td>@item.SalaryMonth</td>
                         <td>@item.Gross</td>
                         <td>@item.Basic</td>
@@ -99,9 +99,7 @@
                         <td>@item.AbsentAmount</td>
                         <td>@item.PayableAmount</td>
                         <td>@item.PaidAmount</td>
-                        <td>
-                            @(item.IsPaid ? "Paid" : "Unpaid")
-                        </td>
+                        <td>@(item.IsPaid ? "Paid" : "Unpaid")</td>
                         <td>
                             <a asp-action="Edit" asp-route-id="@item.SalaryId">Edit</a> |
                             <button class="payBtn" data-id="@item.SalaryId">Pay</button> |
@@ -114,8 +112,8 @@
     </table>
 </div>
 
-
-       @section Scripts {
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         $(document).ready(function() {
             console.log('Script loaded - jQuery ready');
@@ -126,14 +124,86 @@
                 console.error('Anti-forgery token not found!');
             }
 
+            // Escape HTML function
+            function escapeHtml(str) {
+                if (typeof str !== 'string') return '';
+                return str
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            // Filter button - AJAX to update table
+            $('#filterBtn').click(function(e) {
+                e.preventDefault();
+                console.log('Filter button clicked');
+
+                var comId = $('#companyDropdown').val();
+                var year = parseInt($('#yearDropdown').val());
+                var month = parseInt($('#monthDropdown').val());
+
+                console.log('Filter values:', { comId, year, month });
+
+                if (isNaN(year) || isNaN(month)) {
+                    alert('Please select Year and Month.');
+                    return;
+                }
+
+                let url = comId ? `/Salaries/GetSalariesByCompany?comId=${comId}&year=${year}&month=${month}` : `/Salaries/GetAllSalaries?year=${year}&month=${month}`;
+                console.log('Fetching salaries from:', url);
+
+                $.getJSON(url, function(data) {
+                    console.log('Filter response:', data);
+                    $('#salaryTableBody').empty();
+                    if (data.length === 0 || (data.success === false)) {
+                        $('#salaryTableBody').html('<tr><td colspan="12" class="text-center text-muted py-4">No salaries found. Generate some or adjust filters.</td></tr>');
+                        return;
+                    }
+                    $.each(data, function(i, salary) {
+                        let row = `
+                            <tr id="row-${salary.salaryId}" data-comid="${salary.comId}">
+                                <td>${escapeHtml(salary.empName)}</td>
+                                <td>${salary.salaryMonth}</td>
+                                <td>${salary.gross}</td>
+                                <td>${salary.basic}</td>
+                                <td>${salary.hRent}</td>
+                                <td>${salary.medical}</td>
+                                <td>${salary.absentDays}</td>
+                                <td>${salary.absentAmount}</td>
+                                <td>${salary.payableAmount}</td>
+                                <td>${salary.paidAmount}</td>
+                                <td>${salary.isPaid ? 'Paid' : 'Unpaid'}</td>
+                                <td>
+                                    <a href="/Salaries/Edit/${salary.salaryId}">Edit</a> |
+                                    <button class="payBtn" data-id="${salary.salaryId}">Pay</button> |
+                                    <button class="deleteBtn" data-id="${salary.salaryId}">Delete</button>
+                                </td>
+                            </tr>`;
+                        $('#salaryTableBody').append(row);
+                    });
+                }).fail(function(xhr, status, error) {
+                    console.error('Filter error:', {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        responseText: xhr.responseText,
+                        error: error,
+                        url: url
+                    });
+                    $('#salaryTableBody').html('<tr><td colspan="12" class="text-center text-muted py-4">Error loading salaries. Check server status.</td></tr>');
+                    alert('Failed to filter salaries: ' + (xhr.responseJSON?.message || 'Network error or server unavailable.'));
+                });
+            });
+
             // AJAX for Generate Salary
-            $('#generateBtn').click(function (e) {
-                e.preventDefault(); // Prevent any default behavior
+            $('#generateBtn').click(function(e) {
+                e.preventDefault();
                 console.log('Generate button clicked');
 
-                var comId = $('select[name="comId"]').val();
-                var year = parseInt($('select[name="year"]').val());
-                var month = parseInt($('select[name="month"]').val());
+                var comId = $('#companyDropdown').val();
+                var year = parseInt($('#yearDropdown').val());
+                var month = parseInt($('#monthDropdown').val());
 
                 console.log('Form values:', { comId, year, month });
 
@@ -142,7 +212,6 @@
                     return;
                 }
 
-                // Disable button during request
                 var $btn = $(this);
                 $btn.prop('disabled', true).text('Generating...');
 
@@ -155,43 +224,31 @@
                         month: month 
                     },
                     headers: {
-                        'RequestVerificationToken': token  // Add the token here
+                        'RequestVerificationToken': token
                     },
-                    success: function (response) {
+                    success: function(response) {
                         console.log('Success:', response);
                         alert(response.message);
                         if (response.success) {
-                            location.reload();  // Reload to show updated list
+                            $('#filterBtn').trigger('click'); // Refresh table with new data
                         }
                     },
-                    error: function (xhr, status, error) {
+                    error: function(xhr, status, error) {
                         console.error('AJAX Error:', { status, error, response: xhr.responseText });
-                        var msg = 'Unknown error';
-                        if (xhr.status === 400) {
-                            msg = 'Bad Request - Check console for details (likely token or data issue).';
-                        } else if (xhr.responseJSON && xhr.responseJSON.message) {
-                            msg = xhr.responseJSON.message;
-                        }
+                        var msg = xhr.responseJSON?.message || 'Unknown error';
                         alert('Error: ' + msg);
                     },
-                    complete: function () {
+                    complete: function() {
                         $btn.prop('disabled', false).text('Generate Salary');
                     }
                 });
             });
 
-            // Filter button - Just submit the form (GET, no token needed)
-            $('#filterBtn').click(function (e) {
-                e.preventDefault();
-                console.log('Filter button clicked');
-                $('#salaryForm').submit();  // This reloads with query params
-            });
-
-            // AJAX for Pay (if data exists)
-            $(document).on('click', '.payBtn', function () {
+            // AJAX for Pay
+            $(document).on('click', '.payBtn', function() {
                 var id = $(this).data('id');
                 if (!id) return;
-                
+
                 if (!confirm('Mark this salary as paid?')) return;
 
                 $.ajax({
@@ -200,20 +257,20 @@
                     headers: {
                         'RequestVerificationToken': token
                     },
-                    success: function (response) {
+                    success: function(response) {
                         alert(response.message);
                         if (response.success) {
-                            location.reload();
+                            $('#filterBtn').trigger('click'); // Refresh table
                         }
                     },
-                    error: function (xhr) {
+                    error: function(xhr) {
                         alert('Error: ' + (xhr.responseJSON?.message || 'Failed to mark as paid'));
                     }
                 });
             });
 
             // AJAX for Delete
-            $(document).on('click', '.deleteBtn', function () {
+            $(document).on('click', '.deleteBtn', function() {
                 var id = $(this).data('id');
                 if (!id || !confirm('Are you sure you want to delete?')) return;
 
@@ -224,13 +281,13 @@
                     headers: {
                         'RequestVerificationToken': token
                     },
-                    success: function (response) {
+                    success: function(response) {
                         alert(response.message);
                         if (response.success) {
-                            location.reload();
+                            $('#filterBtn').trigger('click'); // Refresh table
                         }
                     },
-                    error: function (xhr) {
+                    error: function(xhr) {
                         alert('Error: ' + (xhr.responseJSON?.message || 'Failed to delete'));
                     }
                 });

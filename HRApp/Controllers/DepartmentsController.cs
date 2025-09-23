@@ -1,9 +1,10 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using HRApp.Models;
+﻿using HRApp.Models;
 using HRApp.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace HRApp.Controllers
 {
@@ -114,32 +115,54 @@ namespace HRApp.Controllers
         [HttpGet]
         public async Task<IActionResult> GetDepartmentsByCompany(Guid comId)
         {
-            var allDepartments = await _unitOfWork.Departments.GetAllAsync();
-            var filtered = await Task.WhenAll(allDepartments
-                .Where(d => d.ComId == comId)
-                .Select(async d => new
-                {
-                    DeptId = d.DeptId.ToString(),
-                    d.DeptName,
-                    d.ComId,
-                    ComName = (await _unitOfWork.Companies.GetAsync(d.ComId))?.ComName ?? "N/A"
-                }));
-            return Json(filtered.ToList());
+            try
+            {
+                Console.WriteLine($"Fetching departments for comId: {comId}");
+                var departments = _unitOfWork.Departments.GetAll(); // IQueryable
+                var filtered = await departments
+                    .Where(d => d.ComId == comId)
+                    .Select(d => new
+                    {
+                        DeptId = d.DeptId.ToString(),
+                        d.DeptName,
+                        d.ComId,
+                        ComName = d.Company != null ? d.Company.ComName : "N/A" // Assuming navigation property
+                    })
+                    .ToListAsync();
+
+                return Json(filtered);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetDepartmentsByCompany: {ex}");
+                return Json(new { success = false, message = "Server error: " + ex.Message });
+            }
         }
 
         [HttpGet]
         public async Task<IActionResult> GetAllDepartments()
         {
-            var allDepartments = await _unitOfWork.Departments.GetAllAsync();
-            var result = await Task.WhenAll(allDepartments
-                .Select(async d => new
-                {
-                    DeptId = d.DeptId.ToString(),
-                    d.DeptName,
-                    d.ComId,
-                    ComName = (await _unitOfWork.Companies.GetAsync(d.ComId))?.ComName ?? "N/A"
-                }));
-            return Json(result.ToList());
+            try
+            {
+                Console.WriteLine("Fetching all departments");
+                var departments = _unitOfWork.Departments.GetAll(); // IQueryable
+                var result = await departments
+                    .Select(d => new
+                    {
+                        DeptId = d.DeptId.ToString(),
+                        d.DeptName,
+                        d.ComId,
+                        ComName = d.Company != null ? d.Company.ComName : "N/A" // Assuming navigation property
+                    })
+                    .ToListAsync();
+
+                return Json(result);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetAllDepartments: {ex}");
+                return Json(new { success = false, message = "Server error: " + ex.Message });
+            }
         }
     }
 }

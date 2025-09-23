@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using HRApp.Models;
 using HRApp.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace HRApp.Controllers
 {
@@ -63,17 +64,17 @@ namespace HRApp.Controllers
             await _unitOfWork.SaveAsync();
 
             var company = await _unitOfWork.Companies.GetAsync(shift.ComId);
-
             return Json(new
             {
                 success = true,
-                message = "Shift created!",
+                message = "Shift created successfully!",
                 shift = new
                 {
-                    shift.ShiftId,
+                    ShiftId = shift.ShiftId.ToString(),
                     shift.ShiftName,
                     StartTime = shift.StartTime.ToString("HH:mm"),
                     EndTime = shift.EndTime.ToString("HH:mm"),
+                    shift.ComId,
                     ComName = company?.ComName ?? "N/A"
                 }
             });
@@ -125,20 +126,66 @@ namespace HRApp.Controllers
             return Json(new { success = true, message = "Shift deleted!" });
         }
 
-        // GET: Shifts/GetShifts (for dropdown or other purposes)
-        public async Task<IActionResult> GetShifts()
+        // GET: Filter by company (AJAX)
+        [HttpGet]
+        public async Task<IActionResult> GetShiftsByCompany(Guid comId)
         {
-            var shifts = await _unitOfWork.Shifts.GetAllAsync();
-            var companies = await _unitOfWork.Companies.GetAllAsync();
-            return Json(shifts.Select(s => new
+            try
             {
-                s.ShiftId,
-                s.ShiftName,
-                StartTime = s.StartTime.ToString("HH:mm"),
-                EndTime = s.EndTime.ToString("HH:mm"),
-                ComId = s.ComId,
-                ComName = companies.FirstOrDefault(c => c.ComId == s.ComId)?.ComName ?? "N/A"
-            }));
+                Console.WriteLine($"Fetching shifts for ComId {comId} at {DateTime.Now}");
+                var shifts = _unitOfWork.Shifts.GetAll(); // IQueryable
+                var result = await shifts
+                    .Where(s => s.ComId == comId)  
+                    .Select(s => new
+                    {
+                        ShiftId = s.ShiftId.ToString(),
+                        s.ShiftName,
+                        StartTime = s.StartTime.ToString("HH:mm"),
+                        EndTime = s.EndTime.ToString("HH:mm"),
+                        s.ComId,
+                        ComName = s.Company != null ? s.Company.ComName : "N/A"
+                    }).ToListAsync();
+
+                if (!result.Any())
+                    Console.WriteLine("No shifts found for this company.");
+
+                return Json(result);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetShiftsByCompany: {ex}");
+                return Json(new { success = false, message = "Server error: " + ex.Message });
+            }
+        }
+        [HttpGet]
+        public async Task<IActionResult> GetAllShifts()
+        {
+            try
+            {
+                Console.WriteLine($"Fetching all shifts at {DateTime.Now}");
+                var shifts = _unitOfWork.Shifts.GetAll(); // IQueryable
+                var result = await shifts
+
+                     .Select(s => new
+                     {
+                         ShiftId = s.ShiftId.ToString(),
+                         s.ShiftName,
+                         StartTime = s.StartTime.ToString("HH:mm"),
+                         EndTime = s.EndTime.ToString("HH:mm"),
+                         s.ComId,
+                         ComName = s.Company != null ? s.Company.ComName : "N/A"
+                     }).ToListAsync();
+
+                if (!result.Any())
+                    Console.WriteLine("No Shifts found.");
+
+                return Json(result);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetAllShifts: {ex}");
+                return Json(new { success = false, message = "Server error: " + ex.Message });
+            }
         }
     }
 }

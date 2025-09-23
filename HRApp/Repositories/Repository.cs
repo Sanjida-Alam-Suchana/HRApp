@@ -19,7 +19,7 @@ namespace HRApp.Repositories
             _context = context;
             _dbSet = context.Set<T>();
         }
-
+        public IQueryable<T> GetAll() => _dbSet;
         public async Task<T?> GetAsync(Guid id)
         {
             return await _dbSet.FindAsync(id);

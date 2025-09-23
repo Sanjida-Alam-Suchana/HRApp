@@ -46,7 +46,86 @@ namespace HRApp.Controllers
 
             return View(salaries);
         }
+        [HttpGet]
+        public async Task<IActionResult> GetSalariesByCompany(Guid comId, int year, int month)
+        {
+            try
+            {
+                Console.WriteLine($"Fetching salaries for ComId={comId}, Year={year}, Month={month} at {DateTime.Now}");
+                var salaries = _unitOfWork.Salaries.GetQueryable()
+                    .Include(s => s.Employee)
+                    .Include(s => s.Company)
+                    .Where(s => s.ComId == comId && s.dtYear == year && s.dtMonth == month);
 
+                var result = await salaries.Select(s => new
+                {
+                    salaryId = s.SalaryId,
+                    comId = s.ComId,
+                    empName = s.Employee != null ? s.Employee.EmpName : "Not Found",
+                    salaryMonth = s.SalaryMonth,
+                    gross = s.Gross,
+                    basic = s.Basic,
+                    hRent = s.HRent,
+                    medical = s.Medical,
+                    absentDays = s.AbsentDays,
+                    absentAmount = s.AbsentAmount,
+                    payableAmount = s.PayableAmount,
+                    paidAmount = s.PaidAmount,
+                    isPaid = s.IsPaid
+                }).ToListAsync();
+
+                if (!result.Any())
+                    Console.WriteLine("No salary records found for this company, year, and month.");
+
+                return Json(result);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetSalariesByCompany: {ex}");
+                return Json(new { success = false, message = "Server error: " + ex.Message });
+            }
+        }
+
+        // GET: Salaries/GetAllSalaries
+        [HttpGet]
+        public async Task<IActionResult> GetAllSalaries(int year, int month)
+        {
+            try
+            {
+                Console.WriteLine($"Fetching all salaries for Year={year}, Month={month} at {DateTime.Now}");
+                var salaries = _unitOfWork.Salaries.GetQueryable()
+                    .Include(s => s.Employee)
+                    .Include(s => s.Company)
+                    .Where(s => s.dtYear == year && s.dtMonth == month);
+
+                var result = await salaries.Select(s => new
+                {
+                    salaryId = s.SalaryId,
+                    comId = s.ComId,
+                    empName = s.Employee != null ? s.Employee.EmpName : "Not Found",
+                    salaryMonth = s.SalaryMonth,
+                    gross = s.Gross,
+                    basic = s.Basic,
+                    hRent = s.HRent,
+                    medical = s.Medical,
+                    absentDays = s.AbsentDays,
+                    absentAmount = s.AbsentAmount,
+                    payableAmount = s.PayableAmount,
+                    paidAmount = s.PaidAmount,
+                    isPaid = s.IsPaid
+                }).ToListAsync();
+
+                if (!result.Any())
+                    Console.WriteLine("No salary records found for this year and month.");
+
+                return Json(result);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetAllSalaries: {ex}");
+                return Json(new { success = false, message = "Server error: " + ex.Message });
+            }
+        }
         // POST: Salaries/Generate
         [HttpPost]
         [ValidateAntiForgeryToken]
