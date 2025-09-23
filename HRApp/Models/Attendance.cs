@@ -17,7 +17,7 @@ namespace HRApp.Models
         public DateOnly dtDate { get; set; }
 
         [Required]
-        private string _attStatus; // Backing field to store the calculated value
+        private string _attStatus;
 
         public string AttStatus
         {

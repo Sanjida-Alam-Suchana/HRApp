@@ -74,23 +74,17 @@
 
 <div class="container mt-4">
     <h2>Bulk Attendance (Excel)</h2>
-    <form id="uploadExcelForm" enctype="multipart/form-data" method="post">
-        @Html.AntiForgeryToken()
-        <div class="mb-3">
-            <label>Select Company</label>
-            <select id="bulkComId" name="bulkComId" class="form-control" required>
-                <option value="">--Select Company--</option>
-                @foreach(var company in companies)
-                {
-                    <option value="@company.ComId">@company.ComName</option>
-                }
-            </select>
-        </div>
-        <input type="file" id="excelFile" name="file" class="form-control mb-2" accept=".xlsx" required />
-        <button type="submit" class="btn btn-primary mb-2">Upload Excel</button>
-        <button type="button" id="downloadTemplateBtn" class="btn btn-info mb-2">Download Excel Template</button>
-        <div id="uploadResult"></div>
-    </form>
+    <div class="mb-3">
+        <label>Select Company</label>
+        <select id="bulkComId" name="bulkComId" class="form-control" required>
+            <option value="">--Select Company--</option>
+            @foreach(var company in companies)
+            {
+                <option value="@company.ComId">@company.ComName</option>
+            }
+        </select>
+    </div>
+    <button type="button" id="downloadTemplateBtn" class="btn btn-info mb-2">Download Excel Template</button>
 </div>
 
 <!-- Edit Modal -->
@@ -280,33 +274,6 @@
                 return;
             }
             window.location.href = `/Attendances/DownloadAttendanceTemplate?comId=${comId}`;
-        });
-
-        $("#uploadExcelForm").submit(function(e) {
-            e.preventDefault();
-            var comId = $("#bulkComId").val();
-            if (!comId) {
-                alert("Select company first.");
-                return;
-            }
-            var formData = new FormData(this);
-            formData.append('bulkComId', comId);
-            $.ajax({
-                url: '/Attendances/UploadExcel',
-                type: 'POST',
-                data: formData,
-                contentType: false,
-                processData: false,
-                success: function(res) {
-                    $("#uploadResult").html(res.success ? 
-                        '<div class="alert alert-success">' + res.message + '</div>' : 
-                        '<div class="alert alert-danger">' + res.message + '</div>');
-                    if (res.success) {
-                        location.reload();
-                    }
-                },
-                error: function() { alert("Error uploading."); }
-            });
         });
     });
     </script>

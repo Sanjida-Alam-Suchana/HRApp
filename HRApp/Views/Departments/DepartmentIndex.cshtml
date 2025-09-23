@@ -29,17 +29,17 @@
         </form>
     </div>
 
-    <!-- Company Filter -->
+@*     <!-- Company Filter -->
     <div class="mb-3">
         <select id="companyDropdown" class="form-select w-50">
-            <option value="">All Companies</option>
+            <option value="">All Companies</option>  
             @foreach(var c in companies)
             {
                 <option value="@c.ComId">@c.ComName</option>
             }
         </select>
     </div>
-
+ *@
     <!-- Department Table -->
     <table class="table table-bordered">
         <thead>
