@@ -56,20 +56,8 @@ namespace HRApp.Controllers
             {
                 return Json(new { success = false, message = "Invalid month format." });
             }
-            var summaryDate = DateOnly.FromDateTime(tempDate); // Convert to DateOnly for clarity
-            Console.WriteLine($"Received SummaryMonth: {SummaryMonth}, Parsed Year: {summaryDate.Year}, Month: {summaryDate.Month}"); // Debug
-
-            // Check for duplicates
-            var existingSummaries = await _unitOfWork.AttendanceSummaries.GetQueryable()
-                .Where(s => s.ComId == comId
-                         && s.SummaryMonth.Year == summaryDate.Year
-                         && s.SummaryMonth.Month == summaryDate.Month)
-                .ToListAsync();
-
-            if (existingSummaries.Any())
-            {
-                return Json(new { success = false, message = "Summary already exists for the selected company and month." });
-            }
+            var summaryDate = new DateTime(tempDate.Year, tempDate.Month, 1);
+            Console.WriteLine($"Parsed SummaryMonth: {SummaryMonth}, Resulting summaryDate: {summaryDate:yyyy-MM-dd}, Year: {summaryDate.Year}, Month: {summaryDate.Month}");
 
             try
             {
@@ -80,10 +68,11 @@ namespace HRApp.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error generating summary: {ex}");
+                Console.WriteLine($"Error generating summary: {ex.Message} - StackTrace: {ex.StackTrace}");
                 return Json(new { success = false, message = ex.Message });
             }
         }
+
         [HttpGet]
         public async Task<IActionResult> GetEmployeesByCompany(Guid comId)
         {

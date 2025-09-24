@@ -35,7 +35,6 @@ namespace HRApp.Controllers
             if (string.IsNullOrWhiteSpace(department.DeptName) || department.ComId == Guid.Empty)
                 return Json(new { success = false, message = "Department name and company are required." });
 
-            // Verify that the company exists
             var company = await _unitOfWork.Companies.GetAsync(department.ComId);
             if (company == null)
                 return Json(new { success = false, message = "Selected company does not exist." });
@@ -50,10 +49,10 @@ namespace HRApp.Controllers
                 message = "Department created successfully!",
                 department = new
                 {
-                    DeptId = department.DeptId.ToString(),
+                    deptId = department.DeptId.ToString(),
                     department.DeptName,
                     department.ComId,
-                    ComName = company.ComName
+                    comName = company.ComName
                 }
             });
         }
@@ -73,7 +72,6 @@ namespace HRApp.Controllers
             if (existing == null)
                 return Json(new { success = false, message = "Department not found." });
 
-            // Verify that the company exists
             var company = await _unitOfWork.Companies.GetAsync(department.ComId);
             if (company == null)
                 return Json(new { success = false, message = "Selected company does not exist." });
@@ -89,10 +87,10 @@ namespace HRApp.Controllers
                 message = "Department updated!",
                 department = new
                 {
-                    DeptId = existing.DeptId.ToString(),
+                    deptId = existing.DeptId.ToString(),
                     existing.DeptName,
                     existing.ComId,
-                    ComName = company.ComName
+                    comName = company.ComName
                 }
             });
         }
@@ -123,10 +121,10 @@ namespace HRApp.Controllers
                     .Where(d => d.ComId == comId)
                     .Select(d => new
                     {
-                        DeptId = d.DeptId.ToString(),
+                        deptId = d.DeptId.ToString(),
                         d.DeptName,
                         d.ComId,
-                        ComName = d.Company != null ? d.Company.ComName : "N/A"
+                        comName = d.Company != null ? d.Company.ComName : "N/A"
                     })
                     .ToListAsync();
 
@@ -138,7 +136,7 @@ namespace HRApp.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetDepartmentsByCompany at {DateTime.Now}: {ex}");
-                return Json(new { success = false, message = "Server error: " + ex.Message });
+                return StatusCode(500, new { success = false, message = "Server error: " + ex.Message });
             }
         }
 
@@ -153,10 +151,10 @@ namespace HRApp.Controllers
                 var result = await departments
                     .Select(d => new
                     {
-                        DeptId = d.DeptId.ToString(),
+                        deptId = d.DeptId.ToString(),
                         d.DeptName,
                         d.ComId,
-                        ComName = d.Company != null ? d.Company.ComName : "N/A"
+                        comName = d.Company != null ? d.Company.ComName : "N/A"
                     })
                     .ToListAsync();
 
@@ -168,7 +166,41 @@ namespace HRApp.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetAllDepartments at {DateTime.Now}: {ex}");
-                return Json(new { success = false, message = "Server error: " + ex.Message });
+                return StatusCode(500, new { success = false, message = "Server error: " + ex.Message });
+            }
+        }
+
+        // GET: Fetch single department (AJAX)
+        [HttpGet]
+        public async Task<IActionResult> GetDepartment(Guid id)
+        {
+            try
+            {
+                Console.WriteLine($"Fetching department for id: {id} at {DateTime.Now}");
+                var department = await _unitOfWork.Departments.GetAsync(id);
+                if (department == null)
+                {
+                    Console.WriteLine($"Department not found for id: {id}");
+                    return NotFound(new { success = false, message = "Department not found." });
+                }
+
+                var company = await _unitOfWork.Companies.GetAsync(department.ComId);
+                return Json(new
+                {
+                    success = true,
+                    department = new
+                    {
+                        deptId = department.DeptId.ToString(),
+                        department.DeptName,
+                        department.ComId,
+                        comName = company != null ? company.ComName : "N/A"
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetDepartment at {DateTime.Now}: {ex}");
+                return StatusCode(500, new { success = false, message = "Server error: " + ex.Message });
             }
         }
     }

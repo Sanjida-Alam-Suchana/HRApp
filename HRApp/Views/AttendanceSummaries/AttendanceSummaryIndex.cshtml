@@ -130,7 +130,7 @@
                     </div>
                     <div class="form-group mb-3">
                         <label for="editSummaryMonth">Summary Month</label>
-                        <input type="month" class="form-control" id="editSummaryMonth" name="SummaryMonth" />
+                        <input type="month" class="form-control" id="genSummaryMonth" name="SummaryMonth"/>
                         <div id="editSummaryMonth-error" class="text-danger"></div>
                     </div>
                     <div class="form-group mb-3">
@@ -216,12 +216,12 @@
                 }
             });
 
-      $("#generateForm").submit(function (e) {
+              $("#generateForm").submit(function (e) {
             e.preventDefault();
             if ($(this).valid()) {
                 var comId = $("#genComId").val();
                 var summaryMonth = $("#genSummaryMonth").val();
-                console.log("Submitting SummaryMonth:", summaryMonth); // Debug
+                console.log("Submitting SummaryMonth:", summaryMonth); // Debug log
                 $.ajax({
                     url: '/AttendanceSummaries/AttendanceSummaryGenerate',
                     type: 'POST',
@@ -244,7 +244,6 @@
                 });
             }
         });
-
             // Edit Form Validation and Submit
             $("#editForm").validate({
                 rules: {

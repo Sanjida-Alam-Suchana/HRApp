@@ -49,15 +49,14 @@ namespace HRApp.Controllers
                 message = "Designation created successfully!",
                 designation = new
                 {
-                    DesigId = designation.DesigId.ToString(),
+                    desigId = designation.DesigId.ToString(),
                     designation.DesigName,
                     designation.ComId,
-                    ComName = company.ComName
+                    comName = company.ComName
                 }
             });
         }
 
-        // POST: Edit
         // POST: Edit
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -88,13 +87,14 @@ namespace HRApp.Controllers
                 message = "Designation updated!",
                 designation = new
                 {
-                    DesigId = existing.DesigId.ToString(),
+                    desigId = existing.DesigId.ToString(),
                     existing.DesigName,
                     existing.ComId,
-                    ComName = company.ComName
+                    comName = company.ComName
                 }
             });
         }
+
         // POST: Delete
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -116,15 +116,15 @@ namespace HRApp.Controllers
             try
             {
                 Console.WriteLine($"Fetching designations for comId: {comId} at {DateTime.Now}");
-                var designations = _unitOfWork.Designations.GetAll(); // IQueryable
+                var designations = _unitOfWork.Designations.GetAll();
                 var filtered = await designations
                     .Where(d => d.ComId == comId)
                     .Select(d => new
                     {
-                        DesigId = d.DesigId.ToString(),
+                        desigId = d.DesigId.ToString(),
                         d.DesigName,
                         d.ComId,
-                        ComName = d.Company != null ? d.Company.ComName : "N/A" // Assuming navigation property
+                        comName = d.Company != null ? d.Company.ComName : "N/A"
                     })
                     .ToListAsync();
 
@@ -136,7 +136,7 @@ namespace HRApp.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetDesignationsByCompany at {DateTime.Now}: {ex}");
-                return Json(new { success = false, message = "Server error: " + ex.Message });
+                return StatusCode(500, new { success = false, message = "Server error: " + ex.Message });
             }
         }
 
@@ -147,14 +147,14 @@ namespace HRApp.Controllers
             try
             {
                 Console.WriteLine($"Fetching all designations at {DateTime.Now}");
-                var designations = _unitOfWork.Designations.GetAll(); // IQueryable
+                var designations = _unitOfWork.Designations.GetAll();
                 var result = await designations
                     .Select(d => new
                     {
-                        DesigId = d.DesigId.ToString(),
+                        desigId = d.DesigId.ToString(),
                         d.DesigName,
                         d.ComId,
-                        ComName = d.Company != null ? d.Company.ComName : "N/A" // Assuming navigation property
+                        comName = d.Company != null ? d.Company.ComName : "N/A"
                     })
                     .ToListAsync();
 
@@ -166,7 +166,41 @@ namespace HRApp.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetAllDesignations at {DateTime.Now}: {ex}");
-                return Json(new { success = false, message = "Server error: " + ex.Message });
+                return StatusCode(500, new { success = false, message = "Server error: " + ex.Message });
+            }
+        }
+
+        // GET: Fetch single designation (AJAX)
+        [HttpGet]
+        public async Task<IActionResult> GetDesignation(Guid id)
+        {
+            try
+            {
+                Console.WriteLine($"Fetching designation for id: {id} at {DateTime.Now}");
+                var designation = await _unitOfWork.Designations.GetAsync(id);
+                if (designation == null)
+                {
+                    Console.WriteLine($"Designation not found for id: {id}");
+                    return NotFound(new { success = false, message = "Designation not found." });
+                }
+
+                var company = await _unitOfWork.Companies.GetAsync(designation.ComId);
+                return Json(new
+                {
+                    success = true,
+                    designation = new
+                    {
+                        desigId = designation.DesigId.ToString(),
+                        designation.DesigName,
+                        designation.ComId,
+                        comName = company != null ? company.ComName : "N/A"
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetDesignation at {DateTime.Now}: {ex}");
+                return StatusCode(500, new { success = false, message = "Server error: " + ex.Message });
             }
         }
     }

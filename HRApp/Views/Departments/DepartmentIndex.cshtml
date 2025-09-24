@@ -7,34 +7,14 @@
 <div class="container mt-4">
     <h2>Departments</h2>
 
-    <!-- Create Form -->
-    <div class="card mb-4 p-3">
-        <h4>Create New Department</h4>
-        <form id="createForm">
-            @Html.AntiForgeryToken()
-            <div class="form-group mb-2">
-                <label for="ComId">Company</label>
-                <select id="ComId" name="ComId" class="form-control">
-                    <option value="">Select Company</option>
-                    @foreach(var c in companies)
-                    {
-                        <option value="@c.ComId">@c.ComName</option>
-                    }
-                </select>
-            </div>
-            <div class="form-group mb-2">
-                <label for="DeptName">Department Name</label>
-                <input type="text" id="DeptName" name="DeptName" class="form-control"/>
-            </div>
-            <button type="submit" class="btn btn-primary">Create</button>
-        </form>
-    </div>
+    <!-- Button to Open Create Modal -->
+    <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#departmentModal" onclick="openCreateModal()">+ Add Department</button>
 
     <!-- Company Filter -->
     <div class="mb-3">
         <select id="companyDropdown" class="form-select w-50">
             <option value="">All Companies</option>
-            @foreach(var c in companies)
+            @foreach (var c in companies)
             {
                 <option value="@c.ComId">@c.ComName</option>
             }
@@ -42,7 +22,7 @@
     </div>
 
     <!-- Department Table -->
-    <table class="table table-bordered">
+    <table class="table table-bordered table-striped" id="departmentTable">
         <thead>
             <tr>
                 <th>Department Name</th>
@@ -50,15 +30,15 @@
                 <th>Actions</th>
             </tr>
         </thead>
-        <tbody id="departmentTable">
-            @foreach(var d in Model)
+        <tbody id="departmentTableBody">
+            @foreach (var d in Model)
             {
                 var companyName = companies.FirstOrDefault(c => c.ComId == d.ComId)?.ComName ?? "N/A";
                 <tr id="row-@d.DeptId" data-comid="@d.ComId">
                     <td>@d.DeptName</td>
                     <td>@companyName</td>
                     <td>
-                        <button class="btn btn-warning btn-sm" onclick="editDepartment('@d.DeptId')">Edit</button>
+                        <button class="btn btn-warning btn-sm" onclick="openEditModal('@d.DeptId')">Edit</button>
                         <button class="btn btn-danger btn-sm" onclick="deleteDepartment('@d.DeptId')">Delete</button>
                     </td>
                 </tr>
@@ -67,212 +47,211 @@
     </table>
 </div>
 
-<!-- AntiForgery for AJAX -->
-<form id="antiForgeryForm">@Html.AntiForgeryToken()</form>
+<!-- Department Modal -->
+<div class="modal fade" id="departmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="departmentForm">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Add Department</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="DeptId" name="DeptId" />
+                    <div class="mb-3">
+                        <label for="ComId">Company</label>
+                        <select id="ComId" name="ComId" class="form-control" required>
+                            <option value="">Select Company</option>
+                            @foreach (var com in companies)
+                            {
+                                <option value="@com.ComId">@com.ComName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="DeptName">Department Name</label>
+                        <input type="text" id="DeptName" name="DeptName" class="form-control" required />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-success">Save</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 @section Scripts {
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        // Function to escape HTML to prevent XSS
+        function escapeHtml(str) {
+            if (typeof str !== 'string') return '';
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
 
-<script>
-$(document).ready(function(){
-    // --- Escape HTML function ---
-    function escapeHtml(str) {
-        if (typeof str !== 'string') return '';
-        return str
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
+        // Open Create Modal
+        function openCreateModal() {
+            $("#departmentForm")[0].reset();
+            $("#DeptId").val('');
+            $("#modalTitle").text("Add Department");
+            $("#ComId").val('');
+            $("#departmentModal").modal("show");
+        }
 
-    // --- Create Department ---
-    $("#createForm").submit(function(e){
-        e.preventDefault();
-        let formData = $(this).serialize();
-        console.log("Form data being sent:", formData);
-        let $button = $(this).find("button[type=submit]");
-        $button.text("Creating...").prop("disabled", true);
-        $.ajax({
-            url: '/Departments/DepartmentCreate',
-            type: 'POST',
-            data: formData,
-            headers: { "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
-            success: function(res){
-                console.log("Create response:", res);
-                alert(res.message || "No message returned from server");
-                if (res.success && res.department) {
-                    let d = res.department;
-                    let deptId = d.DeptId || d.deptId || '';
-                    let deptName = escapeHtml(d.DeptName || d.deptName || '');
-                    let comId = d.ComId || d.comId || '';
-                    let comName = escapeHtml(d.ComName || d.comName || 'N/A');
-
-                    let newRow = `
-                        <tr id="row-${deptId}" data-comid="${comId}">
-                            <td>${deptName}</td>
-                            <td>${comName}</td>
-                            <td>
-                                <button class="btn btn-warning btn-sm" onclick="editDepartment('${deptId}')">Edit</button>
-                                <button class="btn btn-danger btn-sm" onclick="deleteDepartment('${deptId}')">Delete</button>
-                            </td>
-                        </tr>`;
-                    $("#departmentTable").append(newRow);
-                    $("#createForm")[0].reset();
-                } else {
-                    console.error("Invalid response structure:", res);
-                    alert("Failed to update table. Check console for details.");
+        // Open Edit Modal
+        function openEditModal(id) {
+            console.log("Fetching department with ID:", id);
+            $.getJSON('/Departments/GetDepartment/' + id, function (res) {
+                console.log("Department data:", res);
+                if (!res.success || !res.department) {
+                    alert("Failed to load department data: " + (res.message || "Invalid response"));
+                    return;
                 }
-            },
-            error: function(xhr, status, error){
-                console.error("Create error:", {
+                var dept = res.department;
+                $("#modalTitle").text("Edit Department");
+                $("#DeptId").val(dept.deptId);
+                $("#DeptName").val(dept.deptName);
+                $("#ComId").val(dept.comId);
+                $("#departmentModal").modal("show");
+            }).fail(function (xhr, status, error) {
+                console.error("Edit fetch error:", {
                     status: xhr.status,
                     statusText: xhr.statusText,
                     responseText: xhr.responseText,
                     error: error
                 });
-                alert("Failed to create department: " + (xhr.responseJSON?.message || "Unknown error"));
-            },
-            complete: function(){
-                $button.text("Create").prop("disabled", false);
-            }
-        });
-    });
-
-    // --- Company Filter ---
-    $("#companyDropdown").change(function(){
-        let comId = $(this).val();
-        console.log("Selected comId:", comId);
-        $("#departmentTable").empty();
-        let url = comId ? '/Departments/GetDepartmentsByCompany?comId=' + comId : '/Departments/GetAllDepartments';
-        console.log("Fetching departments from:", url);
-        $.getJSON(url, function(data){
-            console.log("Filter response:", data);
-            if (data.length === 0 || (data.success === false)) {
-                $("#departmentTable").html('<tr><td colspan="3">No departments found.</td></tr>');
-                return;
-            }
-            $.each(data, function(i, d){
-                let deptId = d.DeptId || d.deptId || 'Unknown';
-                let deptName = escapeHtml(d.DeptName || d.deptName || 'Unknown');
-                let comIdData = d.ComId || d.comId || '';
-                let comName = escapeHtml(d.ComName || d.comName || 'N/A');
-
-                let row = `
-                    <tr id="row-${deptId}" data-comid="${comIdData}">
-                        <td>${deptName}</td>
-                        <td>${comName}</td>
-                        <td>
-                            <button class="btn btn-warning btn-sm" onclick="editDepartment('${deptId}')">Edit</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteDepartment('${deptId}')">Delete</button>
-                        </td>
-                    </tr>`;
-                $("#departmentTable").append(row);
+                alert("Failed to load department data: " + (xhr.responseJSON?.message || "Unknown error"));
             });
-        }).fail(function(xhr, status, error){
-            console.error("Filter error:", {
-                status: xhr.status,
-                statusText: xhr.statusText,
-                responseText: xhr.responseText,
-                error: error,
-                url: url
-            });
-            $("#departmentTable").html('<tr><td colspan="3">Error loading departments. Check server status.</td></tr>');
-            alert("Failed to filter departments: " + (xhr.responseJSON?.message || "Network error or server unavailable. Please ensure the server is running."));
-        });
-    });
+        }
 
-    // --- Delete Department ---
-    window.deleteDepartment = function(id){
-        if(confirm("Delete this department?")){
+        // Save (Create/Update)
+        $("#departmentForm").submit(function (e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+            console.log("Form data being sent:", [...formData.entries()]);
+            var id = $("#DeptId").val();
+            var url = id ? '/Departments/DepartmentEdit/' + id : '/Departments/DepartmentCreate';
+            console.log("Submitting to URL:", url);
             $.ajax({
-                url: '/Departments/Delete/' + id,
+                url: url,
                 type: 'POST',
-                headers: { "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
-                success: function(res){
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: { "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').val() },
+                success: function (res) {
+                    console.log("Save response:", res);
                     alert(res.message || "No message returned from server");
-                    if(res.success){
-                        $("#row-" + id).remove();
+                    if (res.success && res.department) {
+                        let d = res.department;
+                        let deptId = d.deptId;
+                        let deptName = escapeHtml(d.deptName);
+                        let comId = d.comId;
+                        let comName = escapeHtml(d.comName || 'N/A');
+                        let row = `
+                            <tr id="row-${deptId}" data-comid="${comId}">
+                                <td>${deptName}</td>
+                                <td>${comName}</td>
+                                <td>
+                                    <button class="btn btn-warning btn-sm" onclick="openEditModal('${deptId}')">Edit</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteDepartment('${deptId}')">Delete</button>
+                                </td>
+                            </tr>`;
+                        if (id) {
+                            $("#row-" + id).replaceWith(row);
+                        } else {
+                            $("#departmentTableBody").append(row);
+                        }
+                        $("#departmentModal").modal("hide");
+                        $("#departmentForm")[0].reset();
+                    } else {
+                        console.error("Invalid response structure:", res);
+                        alert("Failed to update table. Check console for details.");
                     }
                 },
-                error: function(xhr, status, error){
-                    console.error("Delete error:", xhr.responseText, status, error);
-                    alert("Failed to delete department: " + (xhr.responseJSON?.message || "Unknown error"));
+                error: function (xhr, status, error) {
+                    console.error("Save error:", {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        responseText: xhr.responseText,
+                        error: error
+                    });
+                    alert("Failed to save department: " + (xhr.responseJSON?.message || "Unknown error"));
                 }
             });
-        }
-    }
-
-    // --- Edit Department ---
-    window.editDepartment = function(id){
-        let row = $("#row-" + id);
-        let name = row.find("td:eq(0)").text();
-        let companyName = row.find("td:eq(1)").text();
-        let newName = prompt("Edit Department Name:", name);
-        if (newName === null || newName.trim() === "") return;
-
-        // Get comId from data attribute
-        let comId = row.data("comid");
-        if (!comId) {
-            let companyOptions = $("#createForm select[name='ComId'] option").map(function(){
-                return { value: $(this).val(), text: $(this).text() };
-            }).get().filter(opt => opt.value !== "");
-            comId = companyOptions[0]?.value; // Fallback to first company if not found
-            if (!comId) {
-                alert("No valid company found.");
-                return;
-            }
-        }
-
-        $.ajax({
-            url: '/Departments/DepartmentEdit/' + id,
-            type: 'POST',
-            headers: { "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
-            data: { DeptId: id, DeptName: newName, ComId: comId },
-            success: function(res){
-                console.log("Edit response:", res);
-                alert(res.message || "No message returned from server");
-                if (res.success && res.department){
-                    row.find("td:eq(0)").text(escapeHtml(res.department.DeptName));
-                    row.find("td:eq(1)").text(escapeHtml(res.department.ComName));
-                    row.attr("data-comid", res.department.ComId);
-
-                    // Refresh table based on current filter
-                    let currentComId = $("#companyDropdown").val() || "";
-                    let url = currentComId ? '/Departments/GetDepartmentsByCompany?comId=' + currentComId : '/Departments/GetAllDepartments';
-                    $.getJSON(url, function(data) {
-                        $("#departmentTable").empty();
-                        if (data.length === 0 || (data.success === false)) {
-                            $("#departmentTable").html('<tr><td colspan="3">No departments found.</td></tr>');
-                            return;
-                        }
-                        $.each(data, function(i, d){
-                            let deptIdData = d.DeptId || d.deptId || 'Unknown';
-                            let deptNameData = escapeHtml(d.DeptName || d.deptName || 'Unknown');
-                            let comIdData = d.ComId || d.comId || '';
-                            let comNameData = escapeHtml(d.ComName || d.comName || 'N/A');
-                            let rowHtml = `
-                                <tr id="row-${deptIdData}" data-comid="${comIdData}">
-                                    <td>${deptNameData}</td>
-                                    <td>${comNameData}</td>
-                                    <td>
-                                        <button class="btn btn-warning btn-sm" onclick="editDepartment('${deptIdData}')">Edit</button>
-                                        <button class="btn btn-danger btn-sm" onclick="deleteDepartment('${deptIdData}')">Delete</button>
-                                    </td>
-                                </tr>`;
-                            $("#departmentTable").append(rowHtml);
-                        });
-                    }).fail(function(xhr, status, error){
-                        console.error("Refresh error after edit:", error);
-                    });
-                }
-            },
-            error: function(xhr, status, error){
-                console.error("Edit error:", xhr.responseText, status, error);
-                alert("Failed to edit department: " + (xhr.responseJSON?.message || "Unknown error"));
-            }
         });
-    }
-});
-</script>
+
+        // Delete Department
+        function deleteDepartment(id) {
+            if (!confirm("Are you sure you want to delete this department?")) return;
+            console.log("Deleting department with ID:", id);
+            $.post('/Departments/Delete/' + id,
+                { __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val() },
+                function (res) {
+                    console.log("Delete response:", res);
+                    alert(res.message || "No message returned from server");
+                    if (res.success) {
+                        $("#row-" + id).remove();
+                    }
+                }).fail(function (xhr, status, error) {
+                    console.error("Delete error:", {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        responseText: xhr.responseText,
+                        error: error
+                    });
+                    alert("Failed to delete department: " + (xhr.responseJSON?.message || "Unknown error"));
+                });
+        }
+
+        // Company Filter
+        $("#companyDropdown").change(function () {
+            let comId = $(this).val();
+            console.log("Selected comId:", comId);
+            let url = comId ? '/Departments/GetDepartmentsByCompany?comId=' + comId : '/Departments/GetAllDepartments';
+            console.log("Fetching departments from:", url);
+            $("#departmentTableBody").html('<tr><td colspan="3">Loading...</td></tr>');
+            $.getJSON(url, function (data) {
+                console.log("Filter response:", data);
+                $("#departmentTableBody").empty();
+                if (data.length === 0 || (data.success === false)) {
+                    $("#departmentTableBody").html('<tr><td colspan="3">No departments found.</td></tr>');
+                    return;
+                }
+                $.each(data, function (i, d) {
+                    let deptId = d.deptId;
+                    let deptName = escapeHtml(d.deptName);
+                    let comId = d.comId;
+                    let comName = escapeHtml(d.comName || 'N/A');
+                    let row = `
+                        <tr id="row-${deptId}" data-comid="${comId}">
+                            <td>${deptName}</td>
+                            <td>${comName}</td>
+                            <td>
+                                <button class="btn btn-warning btn-sm" onclick="openEditModal('${deptId}')">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteDepartment('${deptId}')">Delete</button>
+                            </td>
+                        </tr>`;
+                    $("#departmentTableBody").append(row);
+                });
+            }).fail(function (xhr, status, error) {
+                console.error("Filter error:", {
+                    status: xhr.status,
+                    statusText: xhr.statusText,
+                    responseText: xhr.responseText,
+                    error: error,
+                    url: url
+                });
+                alert("Failed to filter departments: " + (xhr.responseJSON?.message || "Unknown error"));
+            });
+        });
+    </script>
 }
