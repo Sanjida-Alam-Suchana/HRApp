@@ -58,6 +58,7 @@ namespace HRApp.Controllers
         }
 
         // POST: Edit
+        // POST: Edit
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DesignationEdit(Guid id, Designation designation)
@@ -94,7 +95,6 @@ namespace HRApp.Controllers
                 }
             });
         }
-
         // POST: Delete
         [HttpPost]
         [ValidateAntiForgeryToken]

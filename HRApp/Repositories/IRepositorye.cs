@@ -24,6 +24,7 @@ namespace HRApp.Repositories
             Expression<Func<T, bool>>? filter = null,
             params string[] includeProperties
         );
+        Task RemoveAsync(T entity);
 
         // Get a single entity by id including navigation properties.
 

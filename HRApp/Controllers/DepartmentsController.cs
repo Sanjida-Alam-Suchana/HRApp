@@ -117,8 +117,8 @@ namespace HRApp.Controllers
         {
             try
             {
-                Console.WriteLine($"Fetching departments for comId: {comId}");
-                var departments = _unitOfWork.Departments.GetAll(); // IQueryable
+                Console.WriteLine($"Fetching departments for comId: {comId} at {DateTime.Now}");
+                var departments = _unitOfWork.Departments.GetAll().Include(d => d.Company);
                 var filtered = await departments
                     .Where(d => d.ComId == comId)
                     .Select(d => new
@@ -126,41 +126,48 @@ namespace HRApp.Controllers
                         DeptId = d.DeptId.ToString(),
                         d.DeptName,
                         d.ComId,
-                        ComName = d.Company != null ? d.Company.ComName : "N/A" // Assuming navigation property
+                        ComName = d.Company != null ? d.Company.ComName : "N/A"
                     })
                     .ToListAsync();
+
+                if (!filtered.Any())
+                    Console.WriteLine("No departments found for comId: " + comId);
 
                 return Json(filtered);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in GetDepartmentsByCompany: {ex}");
+                Console.WriteLine($"Error in GetDepartmentsByCompany at {DateTime.Now}: {ex}");
                 return Json(new { success = false, message = "Server error: " + ex.Message });
             }
         }
 
+        // GET: Fetch all departments (AJAX)
         [HttpGet]
         public async Task<IActionResult> GetAllDepartments()
         {
             try
             {
-                Console.WriteLine("Fetching all departments");
-                var departments = _unitOfWork.Departments.GetAll(); // IQueryable
+                Console.WriteLine($"Fetching all departments at {DateTime.Now}");
+                var departments = _unitOfWork.Departments.GetAll().Include(d => d.Company);
                 var result = await departments
                     .Select(d => new
                     {
                         DeptId = d.DeptId.ToString(),
                         d.DeptName,
                         d.ComId,
-                        ComName = d.Company != null ? d.Company.ComName : "N/A" // Assuming navigation property
+                        ComName = d.Company != null ? d.Company.ComName : "N/A"
                     })
                     .ToListAsync();
+
+                if (!result.Any())
+                    Console.WriteLine("No departments found.");
 
                 return Json(result);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in GetAllDepartments: {ex}");
+                Console.WriteLine($"Error in GetAllDepartments at {DateTime.Now}: {ex}");
                 return Json(new { success = false, message = "Server error: " + ex.Message });
             }
         }

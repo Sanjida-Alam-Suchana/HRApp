@@ -1,270 +1,321 @@
 ﻿@model IEnumerable<HRApp.Models.Shift>
-@using HRApp.Models
 @{
-    ViewData["Title"] = "Shift List";
-    var companies = ViewBag.Companies as List<Company>;
+    ViewData["Title"] = "Shift Management";
 }
 
+<!-- Bootstrap CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<div class="container mt-4">
-    <h2>Shift List</h2>
+<div class="container">
+    <h2 class="mt-4">@ViewData["Title"]</h2>
 
-    <!-- Create Form -->
-    <div class="card mb-4 p-3">
+    <!-- Create Shift Form -->
+    <div class="form-container card p-4 shadow-sm">
         <h4>Create New Shift</h4>
-        <form id="createForm">@Html.AntiForgeryToken()
+        <form id="createForm" method="post">
+            @Html.AntiForgeryToken()
             <div class="form-group mb-2">
                 <label for="ComId">Company</label>
-                <select id="ComId" name="ComId" class="form-control">
-                    <option value="">Select Company</option>
-                    @foreach (var c in companies)
+                <select id="ComId" name="comId" class="form-select" required>
+                    @foreach (var company in ViewBag.Companies)
                     {
-                        <option value="@c.ComId">@c.ComName</option>
+                        <option value="@company.ComId">@company.ComName</option>
                     }
                 </select>
             </div>
             <div class="form-group mb-2">
                 <label for="ShiftName">Shift Name</label>
-                <input type="text" id="ShiftName" name="ShiftName" class="form-control"/>
+                <input type="text" id="ShiftName" name="shiftName" class="form-control" required>
             </div>
             <div class="form-group mb-2">
                 <label for="StartTime">Start Time</label>
-                <input type="time" id="StartTime" name="StartTime" class="form-control"/>
+                <input type="time" id="StartTime" name="startTime" class="form-control" required>
             </div>
             <div class="form-group mb-2">
                 <label for="EndTime">End Time</label>
-                <input type="time" id="EndTime" name="EndTime" class="form-control"/>
+                <input type="time" id="EndTime" name="endTime" class="form-control" required>
             </div>
-            <button type="submit" class="btn btn-primary">Create</button>
+            <button type="submit" class="btn btn-primary mt-3">Create</button>
         </form>
     </div>
 
-    <!-- Company Filter -->
-    <div class="mb-3">
-        <select id="companyDropdown" class="form-select w-50">
+    <!-- Filter Dropdown -->
+    <div class="mt-4">
+        <label for="companyDropdown">Filter by Company:</label>
+        <select id="companyDropdown" class="form-select w-auto d-inline-block" style="max-width: 300px;">
             <option value="">All Companies</option>
-            @foreach (var c in companies)
+            @foreach (var company in ViewBag.Companies)
             {
-                <option value="@c.ComId">@c.ComName</option>
+                <option value="@company.ComId">@company.ComName</option>
             }
         </select>
     </div>
 
     <!-- Shift Table -->
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th>Shift Name</th>
-                <th>Start Time</th>
-                <th>End Time</th>
-                <th>Company</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody id="shiftTable">
-            @foreach (var shift in Model)
-            {
-                var companyName = companies.FirstOrDefault(c => c.ComId == shift.ComId)?.ComName ?? "N/A";
-                <tr id="row-@shift.ShiftId">
-                    <td>@shift.ShiftName</td>
-                    <td>@shift.StartTime.ToString("HH:mm")</td>
-                    <td>@shift.EndTime.ToString("HH:mm")</td>
-                    <td>@companyName</td>
-                    <td>
-                        <button class="btn btn-warning btn-sm" onclick="editShift('@shift.ShiftId')">Edit</button>
-                        <button class="btn btn-danger btn-sm" onclick="deleteShift('@shift.ShiftId')">Delete</button>
-                    </td>
+    <div class="table-responsive">
+        <table id="shiftTable" class="table table-striped mt-3">
+            <thead>
+                <tr>
+                    <th>Shift Name</th>
+                    <th>Start Time</th>
+                    <th>End Time</th>
+                    <th>Company</th>
+                    <th>Actions</th>
                 </tr>
-            }
-        </tbody>
-    </table>
-</div>
-
-<form id="antiForgeryForm">@Html.AntiForgeryToken()</form>
-
-@section Scripts {
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
-<script>
-$(document).ready(function(){
-    // --- Escape HTML function ---
-    function escapeHtml(str) {
-        if (typeof str !== 'string') return '';
-        return str
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-
-    // --- Create Shift ---
-    $("#createForm").submit(function(e){
-        e.preventDefault();
-        let formData = $(this).serialize();
-        console.log("Form data being sent:", formData);
-        let $button = $(this).find("button[type=submit]");
-        $button.text("Creating...").prop("disabled", true);
-        $.ajax({
-            url: '/Shifts/ShiftCreate',
-            type: 'POST',
-            data: formData,
-            headers: { "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
-            success: function(res){
-                console.log("Create response:", res);
-                alert(res.message || "No message returned from server");
-                if (res.success && res.shift) {
-                    let s = res.shift;
-                    let shiftId = s.ShiftId || s.shiftId || '';
-                    let shiftName = escapeHtml(s.ShiftName || s.shiftName || '');
-                    let startTime = s.StartTime || '00:00';
-                    let endTime = s.EndTime || '00:00';
-                    let comId = s.ComId || s.comId || '';
-                    let comName = escapeHtml(s.ComName || s.comName || 'N/A');
-
-                    let newRow = `
-                        <tr id="row-${shiftId}" data-comid="${comId}">
-                            <td>${shiftName}</td>
-                            <td>${startTime}</td>
-                            <td>${endTime}</td>
-                            <td>${comName}</td>
-                            <td>
-                                <button class="btn btn-warning btn-sm" onclick="editShift('${shiftId}')">Edit</button>
-                                <button class="btn btn-danger btn-sm" onclick="deleteShift('${shiftId}')">Delete</button>
-                            </td>
-                        </tr>`;
-                    $("#shiftTable").append(newRow);
-                    $("#createForm")[0].reset();
-                } else {
-                    console.error("Invalid response structure:", res);
-                    alert("Failed to update table. Check console for details.");
+            </thead>
+            <tbody>
+                @foreach (var shift in Model)
+                {
+                    <tr id="row-@shift.ShiftId" data-comid="@shift.ComId">
+                        <td>@shift.ShiftName</td>
+                        <td>@shift.StartTime.ToString("HH:mm")</td>
+                        <td>@shift.EndTime.ToString("HH:mm")</td>
+                        <td>@shift.Company?.ComName</td>
+                        <td>
+                            <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editModal" onclick="editShift('@shift.ShiftId')">Edit</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteShift('@shift.ShiftId')">Delete</button>
+                        </td>
+                    </tr>
                 }
-            },
-            error: function(xhr, status, error){
-                console.error("Create error:", {
-                    status: xhr.status,
-                    statusText: xhr.statusText,
-                    responseText: xhr.responseText,
-                    error: error
-                });
-                alert("Failed to create shift: " + (xhr.responseJSON?.message || "Unknown error"));
-            },
-            complete: function(){
-                $button.text("Create").prop("disabled", false);
-            }
-        });
-    });
+            </tbody>
+        </table>
+    </div>
 
-    // --- Company Filter ---
-    $("#companyDropdown").change(function(){
-        let comId = $(this).val();
-        console.log("Selected comId:", comId);
-        $("#shiftTable").empty();
-        let url = comId ? '/Shifts/GetShiftsByCompany?comId=' + comId : '/Shifts/GetAllShifts';
-        console.log("Fetching shifts from:", url);
-        $.getJSON(url, function(data){
-            console.log("Filter response:", data);
-            if (data.length === 0 || (data.success === false)) {
-                $("#shiftTable").html('<tr><td colspan="5">No shifts found.</td></tr>');
+    <!-- Edit Modal -->
+    <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editModalLabel">Edit Shift</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" id="editShiftId" name="shiftId">
+                        <input type="hidden" id="editComId" name="comId">
+                        <div class="mb-3">
+                            <label for="editShiftName" class="form-label">Shift Name</label>
+                            <input type="text" class="form-control" id="editShiftName" name="shiftName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editStartTime" class="form-label">Start Time</label>
+                            <input type="time" class="form-control" id="editStartTime" name="startTime" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editEndTime" class="form-label">End Time</label>
+                            <input type="time" class="form-control" id="editEndTime" name="endTime" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="saveEdit">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Scripts -->
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Initialize modal
+        const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+
+        // Open edit modal
+        window.editShift = function(shiftId) {
+            let row = $("#row-" + shiftId);
+
+            $("#editShiftId").val(shiftId);
+            $("#editComId").val(row.data("comid"));
+            $("#editShiftName").val(row.find("td:eq(0)").text());
+            $("#editStartTime").val(row.find("td:eq(1)").text());
+            $("#editEndTime").val(row.find("td:eq(2)").text());
+
+            editModal.show();
+        };
+
+        // Save changes (updated to fix freeze: no alert, force backdrop removal)
+        $("#saveEdit").on("click", function() {
+            let shiftId = $("#editShiftId").val();
+            let comId = $("#editComId").val();
+            let shiftName = $("#editShiftName").val().trim();
+            let startTime = $("#editStartTime").val();
+            let endTime = $("#editEndTime").val();
+
+            if (!shiftName || !startTime || !endTime) {
+                alert("Please fill in all fields.");
                 return;
             }
-            $.each(data, function(i, s){
-                let shiftId = s.ShiftId || s.shiftId || 'Unknown';
-                let shiftName = escapeHtml(s.ShiftName || s.shiftName || 'Unknown');
-                let startTime = s.StartTime || '00:00';
-                let endTime = s.EndTime || '00:00';
-                let comId = s.ComId || s.comId || '';
-                let comName = escapeHtml(s.ComName || s.comName || 'N/A');
-
-                let row = `
-                    <tr id="row-${shiftId}" data-comid="${comId}">
-                        <td>${shiftName}</td>
-                        <td>${startTime}</td>
-                        <td>${endTime}</td>
-                        <td>${comName}</td>
-                        <td>
-                            <button class="btn btn-warning btn-sm" onclick="editShift('${shiftId}')">Edit</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteShift('${shiftId}')">Delete</button>
-                        </td>
-                    </tr>`;
-                $("#shiftTable").append(row);
-            });
-        }).fail(function(xhr, status, error){
-            console.error("Filter error:", {
-                status: xhr.status,
-                statusText: xhr.statusText,
-                responseText: xhr.responseText,
-                error: error,
-                url: url
-            });
-            $("#shiftTable").html('<tr><td colspan="5">Error loading shifts. Check server status.</td></tr>');
-            alert("Failed to filter shifts: " + (xhr.responseJSON?.message || "Network error or server unavailable. Please ensure the server is running."));
-        });
-    });
-
-    // --- Delete Shift ---
-    function deleteShift(id){
-        if(confirm("Delete this shift?")){
-            $.ajax({
-                url:'/Shifts/Delete/'+id,
-                type:'POST',
-                headers:{ "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
-                success:function(res){
-                    alert(res.message || "No message returned from server");
-                    if(res.success) $("#row-"+id).remove();
-                },
-                error: function(xhr, status, error){
-                    console.error("Delete error:", xhr.responseText, status, error);
-                    alert("Failed to delete shift: " + (xhr.responseJSON?.message || "Unknown error"));
-                }
-            });
-        }
-    }
-
-    // --- Edit Shift ---
-    function editShift(id){
-        let row = $("#row-"+id);
-        let oldName = row.find("td:eq(0)").text();
-        let oldStart = row.find("td:eq(1)").text();
-        let oldEnd = row.find("td:eq(2)").text();
-        let oldCompany = row.find("td:eq(3)").text();
-
-        let newName = prompt("Edit Shift Name:", oldName);
-        if(newName === null) return;
-
-        let newStart = prompt("Edit Start Time (HH:mm):", oldStart);
-        if(newStart === null) return;
-
-        let newEnd = prompt("Edit End Time (HH:mm):", oldEnd);
-        if(newEnd === null) return;
-
-        let newCompanyName = prompt("Edit Company Name:", oldCompany);
-        if(newCompanyName === null) return;
-
-        // Find the ComId based on name
-        let comId = $("#ComId option").filter(function(){ return $(this).text() === newCompanyName; }).val();
-        if(!comId) { alert("Invalid company selected."); return; }
-
-        $.ajax({
-            url:'/Shifts/ShiftEdit/'+id,
-            type:'POST',
-            data: { ShiftId:id, ShiftName:newName, StartTime:newStart, EndTime:newEnd, ComId:comId },
-            headers:{ "RequestVerificationToken": $('#antiForgeryForm input[name="__RequestVerificationToken"]').val() },
-            success:function(res){
-                alert(res.message || "No message returned from server");
-                if(res.success){
-                    row.find("td:eq(0)").text(newName);
-                    row.find("td:eq(1)").text(newStart);
-                    row.find("td:eq(2)").text(newEnd);
-                    row.find("td:eq(3)").text(newCompanyName);
-                }
-            },
-            error: function(xhr, status, error){
-                console.error("Edit error:", xhr.responseText, status, error);
-                alert("Failed to edit shift: " + (xhr.responseJSON?.message || "Unknown error"));
+            if (startTime >= endTime) {
+                alert("End time must be after start time.");
+                return;
             }
+
+            let $btn = $(this);
+            $btn.text("Saving...").prop("disabled", true);
+
+            $.ajax({
+                url: '/Shifts/ShiftEdit/' + shiftId,
+                type: 'POST',
+                headers: { "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').val() },
+                data: { shiftId, shiftName, startTime, endTime, comId },
+                success: function(res) {
+                    if (res.success) {
+                        let row = $("#row-" + shiftId);
+                        row.find("td:eq(0)").text(shiftName);
+                        row.find("td:eq(1)").text(startTime);
+                        row.find("td:eq(2)").text(endTime);
+
+                        // Hide modal with delay for DOM settle, then force-remove backdrop to prevent freeze
+                        setTimeout(() => {
+                            editModal.hide();
+                            $("#editModal").modal("hide"); // Fallback
+                            // Force fix for freeze
+                            $('body').removeClass('modal-open');
+                            $('.modal-backdrop').remove();
+                        }, 100);
+                    } else {
+                        alert(res.message || "Failed to update shift.");
+                    }
+                },
+                error: function() {
+                    alert("Server error. Please try again.");
+                },
+                complete: function() {
+                    $btn.text("Save Changes").prop("disabled", false);
+                }
+            });
         });
+           // Delete
+            window.deleteShift = function(shiftId) {
+                if (confirm("Delete this shift?")) {
+                    $.ajax({
+                        url: '/Shifts/Delete/' + shiftId,
+                        type: 'POST',
+                        headers: { "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').val() },
+                        success: function(res) {
+                            if (res.success) {
+                                $("#row-" + shiftId).remove();
+                                alert(res.message || "Shift deleted successfully!");
+                            } else {
+                                alert(res.message || "Failed to delete shift.");
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            let errorMsg = xhr.responseText ? (xhr.responseText.includes('{') ? JSON.parse(xhr.responseText).message : xhr.responseText) : "Server error";
+                            alert("Failed to delete shift: " + errorMsg);
+                        }
+                    });
+                }
+            };
+
+            $(document).ready(function() {
+                $("#createForm").submit(function(e) {
+                    e.preventDefault();
+                    let formData = $(this).serialize();
+                    let $button = $(this).find("button[type=submit]");
+                    $button.text("Creating...").prop("disabled", true);
+
+                    let startTime = $("#StartTime").val();
+                    let endTime = $("#EndTime").val();
+                    if (!startTime || !endTime) {
+                        alert("Please enter both start and end times.");
+                        $button.text("Create").prop("disabled", false);
+                        return;
+                    }
+
+                    $.ajax({
+                        url: '/Shifts/ShiftCreate',
+                        type: 'POST',
+                        data: formData,
+                        headers: { "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').val() },
+                        success: function(res) {
+                            if (!res.success || !res.shift) {
+                                alert(res.message || "Failed to create shift.");
+                                return;
+                            }
+                            let s = res.shift;
+                            let shiftId = s.shiftId || '';
+                            let shiftName = escapeHtml(s.shiftName || '');
+                            let startTime = s.startTime || '00:00';
+                            let endTime = s.endTime || '00:00';
+                            let comId = s.comId || '';
+                            let comName = escapeHtml(s.comName || 'N/A');
+
+                            let newRow = `
+                                <tr id="row-${shiftId}" data-comid="${comId}">
+                                    <td>${shiftName}</td>
+                                    <td>${startTime}</td>
+                                    <td>${endTime}</td>
+                                    <td>${comName}</td>
+                                    <td>
+                                      <button class="btn btn-warning btn-sm" onclick="editShift('${shiftId}')">Edit</button>
+
+                                        <button class="btn btn-danger btn-sm" onclick="deleteShift('${shiftId}')">Delete</button>
+                                    </td>
+                                </tr>`;
+                            $("#shiftTable tbody").append(newRow);
+                            $("#createForm")[0].reset();
+                            alert(res.message || "Shift created successfully!");
+                        },
+                        error: function(xhr, status, error) {
+                            alert("Failed to create shift: " + (xhr.responseJSON?.message || "Unknown error"));
+                        },
+                        complete: function() {
+                            $button.text("Create").prop("disabled", false);
+                        }
+                    });
+                });
+
+                $("#companyDropdown").change(function() {
+                    let comId = $(this).val();
+                    $("#shiftTable tbody").empty();
+                    let url = comId ? '/Shifts/GetShiftsByCompany?comId=' + comId : '/Shifts/GetAllShifts';
+                    $.getJSON(url, function(data) {
+                        if (!data || data.length === 0) {
+                            $("#shiftTable tbody").html('<tr><td colspan="5">No shifts found.</td></tr>');
+                            return;
+                        }
+                        $.each(data, function(i, s) {
+                            let shiftId = s.shiftId || 'Unknown';
+                            let shiftName = escapeHtml(s.shiftName || 'Unknown');
+                            let startTime = s.startTime || '00:00';
+                            let endTime = s.endTime || '00:00';
+                            let comId = s.comId || '';
+                            let comName = escapeHtml(s.comName || 'N/A');
+
+                            let row = `
+                                <tr id="row-${shiftId}" data-comid="${comId}">
+                                    <td>${shiftName}</td>
+                                    <td>${startTime}</td>
+                                    <td>${endTime}</td>
+                                    <td>${comName}</td>
+                                    <td>
+                                        <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editModal" onclick="editShift('${shiftId}')">Edit</button>
+                                        <button class="btn btn-danger btn-sm" onclick="deleteShift('${shiftId}')">Delete</button>
+                                    </td>
+                                </tr>`;
+                            $("#shiftTable tbody").append(row);
+                        });
+                    }).fail(function(xhr, status, error) {
+                        $("#shiftTable tbody").html('<tr><td colspan="5">Error loading shifts. Check server status.</td></tr>');
+                        alert("Failed to filter shifts: " + (xhr.responseJSON?.message || "Network error or server unavailable."));
+                    });
+                });
+            });
+
+            function escapeHtml(str) {
+                if (typeof str !== 'string') return '';
+                return str
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+        </script>
     }
-});
-</script>
-}

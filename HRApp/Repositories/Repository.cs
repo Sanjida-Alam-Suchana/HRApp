@@ -85,6 +85,11 @@ namespace HRApp.Repositories
             return _dbSet.AsQueryable();
         }
 
+        public async Task RemoveAsync(T entity)
+        {
+            _dbSet.Remove(entity);
+            await SaveAsync(); // Ensure changes are saved
+        }
         public async Task ExecuteSqlRawAsync(string sql, params object[] parameters)
         {
             await _context.Database.ExecuteSqlRawAsync(sql, parameters);

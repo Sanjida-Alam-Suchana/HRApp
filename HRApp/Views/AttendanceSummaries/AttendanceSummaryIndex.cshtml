@@ -1,20 +1,20 @@
-﻿<!-- AttendanceSummaryIndex.cshtml (Added full edit modal code assuming truncated part, updated error handler for debugging) -->
+﻿<!-- AttendanceSummaryIndex.cshtml -->
 @model IEnumerable<HRApp.Models.AttendanceSummary>
 @using HRApp.Models
 @{
     ViewData["Title"] = "Attendance Summary List";
-    var companies = ViewBag.Companies as List<Company>;
+    var companies = ViewBag.Companies as List<Company> ?? new List<Company>();
 }
 
 <div class="container mt-4">
     <h2>Attendance Summary List</h2>
     
-    <!-- Company Dropdown -->
+    <!-- Company Dropdown for Filtering -->
     <div class="form-group mb-3">
         <label for="companyDropdown">Filter by Company</label>
         <select id="companyDropdown" class="form-control" onchange="setCompany(this.value)">
             <option value="">All Companies</option>
-            @foreach (var company in companies ?? new List<Company>())
+            @foreach (var company in companies)
             {
                 <option value="@company.ComId">@company.ComName</option>
             }
@@ -72,33 +72,33 @@
                 <h5 class="modal-title" id="generateModalLabel">Generate Attendance Summary</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <form id="generateForm">
-                    @Html.AntiForgeryToken()
-                    <div class="form-group mb-3">
-                        <label for="genComId">Company</label>
-                        <select id="genComId" name="ComId" class="form-control">
-                            <option value="">Select Company</option>
-                            @foreach (var company in companies ?? new List<Company>())
-                            {
-                                <option value="@company.ComId">@company.ComName</option>
-                            }
-                        </select>
-                        <div id="genComId-error" class="text-danger"></div>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label for="genSummaryMonth">Summary Month</label>
-                        <input type="month" class="form-control" id="genSummaryMonth" name="SummaryMonth" value="@DateTime.Now.ToString("yyyy-MM")" />
-                        <div id="genSummaryMonth-error" class="text-danger"></div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Generate</button>
-                </form>
-            </div>
+<div class="modal-body">
+    <form id="generateForm">
+        @Html.AntiForgeryToken()
+        <div class="form-group mb-3">
+            <label for="genComId">Company</label>
+            <select id="genComId" name="ComId" class="form-control">
+                <option value="">Select Company</option>
+                @foreach (var company in companies)
+                {
+                    <option value="@company.ComId">@company.ComName</option>
+                }
+            </select>
+            <div id="genComId-error" class="text-danger"></div>
+        </div>
+        <div class="form-group mb-3">
+            <label for="genSummaryMonth">Summary Month</label>
+            <input type="month" class="form-control" id="genSummaryMonth" name="SummaryMonth" value="@DateTime.Now.ToString("yyyy-MM")" />
+            <div id="genSummaryMonth-error" class="text-danger"></div>
+        </div>
+        <button type="submit" class="btn btn-primary">Generate</button>
+    </form>
+</div>
         </div>
     </div>
 </div>
 
-<!-- Edit Modal (Full code, assuming truncated part was for DaysPresent, DaysAbsent, DaysLate, Remarks) -->
+<!-- Edit Modal -->
 <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -121,7 +121,7 @@
                         <label for="editComId">Company</label>
                         <select id="editComId" name="ComId" class="form-control">
                             <option value="">Select Company</option>
-                            @foreach (var company in companies ?? new List<Company>())
+                            @foreach (var company in companies)
                             {
                                 <option value="@company.ComId">@company.ComName</option>
                             }
@@ -181,18 +181,15 @@
                 $.ajax({
                     url: '/AttendanceSummaries/Delete',
                     type: 'POST',
-                    data: { id: id },
-                    headers: {
-                        "RequestVerificationToken": $('input[name="__RequestVerificationToken"]').val()
-                    },
+                    data: { id: id, __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val() },
                     success: function (response) {
                         alert(response.message);
                         if (response.success) {
                             $('#row-' + id).remove();
                         }
                     },
-                    error: function () {
-                        alert("Failed to delete summary.");
+                    error: function (xhr) {
+                        alert("Failed to delete summary: " + (xhr.responseJSON?.message || "Unknown error"));
                     }
                 });
             }
@@ -219,39 +216,34 @@
                 }
             });
 
-            $("#generateForm").submit(function (e) {
-                e.preventDefault();
-                if ($(this).valid()) {
-                    var comId = $("#genComId").val();
-                    var summaryMonth = $("#genSummaryMonth").val(); // yyyy-MM format
-                    
-                    $.ajax({
-                        url: '/AttendanceSummaries/AttendanceSummaryGenerate',
-                        type: 'POST',
-                        data: {
-                            __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val(),
-                            ComId: comId,
-                            SummaryMonth: summaryMonth
-                        },
-                        success: function (response) {
-                            alert(response.message);
-                            if (response.success) {
-                                $('#generateModal').modal('hide');
-                                location.reload();
-                            }
-                        },
-                        error: function (xhr, status, error) {
-                            console.log("AJAX Error:", {
-                                status: status,
-                                error: error,
-                                responseText: xhr.responseText,
-                                responseJSON: xhr.responseJSON
-                            });
-                            alert("Failed to generate summary: " + (xhr.responseJSON?.message || "Unknown error"));
+      $("#generateForm").submit(function (e) {
+            e.preventDefault();
+            if ($(this).valid()) {
+                var comId = $("#genComId").val();
+                var summaryMonth = $("#genSummaryMonth").val();
+                console.log("Submitting SummaryMonth:", summaryMonth); // Debug
+                $.ajax({
+                    url: '/AttendanceSummaries/AttendanceSummaryGenerate',
+                    type: 'POST',
+                    data: {
+                        __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val(),
+                        ComId: comId,
+                        SummaryMonth: summaryMonth
+                    },
+                    success: function (response) {
+                        alert(response.message);
+                        if (response.success) {
+                            $('#generateModal').modal('hide');
+                            location.reload();
                         }
-                    });
-                }
-            });
+                    },
+                    error: function (xhr) {
+                        console.log("AJAX Error:", xhr.responseText);
+                        alert("Failed to generate summary: " + (xhr.responseJSON?.message || "Unknown error"));
+                    }
+                });
+            }
+        });
 
             // Edit Form Validation and Submit
             $("#editForm").validate({
@@ -293,13 +285,12 @@
                             alert(response.message);
                             if (response.success) {
                                 $('#editModal').modal('hide');
-                                location.reload(); // Refresh the list
+                                location.reload();
                             }
                         },
-                        error: function (xhr, status, error) {
+                        error: function (xhr) {
                             console.log("AJAX Error:", {
-                                status: status,
-                                error: error,
+                                status: xhr.status,
                                 responseText: xhr.responseText,
                                 responseJSON: xhr.responseJSON
                             });
@@ -309,15 +300,26 @@
                 }
             });
 
-            // Edit Modal Population (Added AJAX to populate employees based on ComId)
+            // Populate Edit Modal
             $('.edit-btn').click(function () {
                 var row = $(this).closest('tr');
                 var summaryId = row.data('summaryid');
                 var comId = row.data('comid');
+                var summaryMonth = row.find('td:eq(2)').text();
+                var totalDays = row.find('td:eq(3)').text();
+                var daysPresent = row.find('td:eq(4)').text();
+                var daysAbsent = row.find('td:eq(5)').text();
+                var daysLate = row.find('td:eq(6)').text();
+                var remarks = row.find('td:eq(7)').text();
 
-                // Set basic fields
                 $('#editSummaryId').val(summaryId);
                 $('#editComId').val(comId);
+                $('#editSummaryMonth').val(summaryMonth);
+                $('#editTotalDays').val(totalDays);
+                $('#editDaysPresent').val(daysPresent);
+                $('#editDaysAbsent').val(daysAbsent);
+                $('#editDaysLate').val(daysLate);
+                $('#editRemarks').val(remarks);
 
                 // Populate employees via AJAX
                 $.ajax({
@@ -329,11 +331,12 @@
                         $.each(employees, function (i, emp) {
                             $('#editEmpId').append('<option value="' + emp.empId + '">' + emp.empName + '</option>');
                         });
+                        // Set the employee ID (requires EmpId in data attributes or additional AJAX call)
+                    },
+                    error: function () {
+                        alert("Failed to load employees.");
                     }
                 });
-
-                // Populate other fields (assuming you add data attributes to the row for population)
-                // Example: $('#editSummaryMonth').val(row.find('td:eq(2)').text());
 
                 $('#editModal').modal('show');
             });

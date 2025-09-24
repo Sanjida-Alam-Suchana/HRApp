@@ -16,7 +16,7 @@
                 <label for="ComId">Company</label>
                 <select id="ComId" name="ComId" class="form-control">
                     <option value="">Select Company</option>
-                    @foreach (var c in companies)
+                    @foreach(var c in companies)
                     {
                         <option value="@c.ComId">@c.ComName</option>
                     }
@@ -24,7 +24,7 @@
             </div>
             <div class="form-group mb-2">
                 <label for="DeptName">Department Name</label>
-                <input type="text" id="DeptName" name="DeptName" class="form-control" />
+                <input type="text" id="DeptName" name="DeptName" class="form-control"/>
             </div>
             <button type="submit" class="btn btn-primary">Create</button>
         </form>
@@ -34,7 +34,7 @@
     <div class="mb-3">
         <select id="companyDropdown" class="form-select w-50">
             <option value="">All Companies</option>
-            @foreach (var c in companies)
+            @foreach(var c in companies)
             {
                 <option value="@c.ComId">@c.ComName</option>
             }
@@ -51,7 +51,7 @@
             </tr>
         </thead>
         <tbody id="departmentTable">
-            @foreach (var d in Model)
+            @foreach(var d in Model)
             {
                 var companyName = companies.FirstOrDefault(c => c.ComId == d.ComId)?.ComName ?? "N/A";
                 <tr id="row-@d.DeptId" data-comid="@d.ComId">
@@ -67,16 +67,18 @@
     </table>
 </div>
 
+<!-- AntiForgery for AJAX -->
 <form id="antiForgeryForm">@Html.AntiForgeryToken()</form>
 
 @section Scripts {
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
 <script>
 $(document).ready(function(){
-    // Function to escape HTML to prevent XSS
-    function escapeHtml(text) {
-        if (!text) return '';
-        return text
+    // --- Escape HTML function ---
+    function escapeHtml(str) {
+        if (typeof str !== 'string') return '';
+        return str
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
@@ -91,7 +93,6 @@ $(document).ready(function(){
         console.log("Form data being sent:", formData);
         let $button = $(this).find("button[type=submit]");
         $button.text("Creating...").prop("disabled", true);
-
         $.ajax({
             url: '/Departments/DepartmentCreate',
             type: 'POST',
@@ -106,6 +107,7 @@ $(document).ready(function(){
                     let deptName = escapeHtml(d.DeptName || d.deptName || '');
                     let comId = d.ComId || d.comId || '';
                     let comName = escapeHtml(d.ComName || d.comName || 'N/A');
+
                     let newRow = `
                         <tr id="row-${deptId}" data-comid="${comId}">
                             <td>${deptName}</td>
@@ -137,48 +139,49 @@ $(document).ready(function(){
         });
     });
 
+    // --- Company Filter ---
     $("#companyDropdown").change(function(){
-    let comId = $(this).val();
-    console.log("Selected comId:", comId);
-    $("#departmentTable").empty();
-    let url = comId ? '/Departments/GetDepartmentsByCompany?comId=' + comId : '/Departments/GetAllDepartments';
-    console.log("Fetching departments from:", url);
-    $.getJSON(url, function(data){
-        console.log("Filter response data length:", data.length);
-        console.log("Filter response data:", data);
-        if (data.length === 0) {
-            $("#departmentTable").html('<tr><td colspan="3">No departments found.</td></tr>');
-            return;
-        }
-        $.each(data, function(i, d){
-            console.log("Processing department:", d);
-            let deptId = d.DeptId || d.deptId || 'Unknown';
-            let deptName = escapeHtml(d.DeptName || d.deptName || 'Unknown');
-            let comId = d.ComId || d.comId || '';
-            let comName = escapeHtml(d.ComName || d.comName || 'N/A');
-            let row = `
-                <tr id="row-${deptId}" data-comid="${comId}">
-                    <td>${deptName}</td>
-                    <td>${comName}</td>
-                    <td>
-                        <button class="btn btn-warning btn-sm" onclick="editDepartment('${deptId}')">Edit</button>
-                        <button class="btn btn-danger btn-sm" onclick="deleteDepartment('${deptId}')">Delete</button>
-                    </td>
-                </tr>`;
-            $("#departmentTable").append(row);
+        let comId = $(this).val();
+        console.log("Selected comId:", comId);
+        $("#departmentTable").empty();
+        let url = comId ? '/Departments/GetDepartmentsByCompany?comId=' + comId : '/Departments/GetAllDepartments';
+        console.log("Fetching departments from:", url);
+        $.getJSON(url, function(data){
+            console.log("Filter response:", data);
+            if (data.length === 0 || (data.success === false)) {
+                $("#departmentTable").html('<tr><td colspan="3">No departments found.</td></tr>');
+                return;
+            }
+            $.each(data, function(i, d){
+                let deptId = d.DeptId || d.deptId || 'Unknown';
+                let deptName = escapeHtml(d.DeptName || d.deptName || 'Unknown');
+                let comIdData = d.ComId || d.comId || '';
+                let comName = escapeHtml(d.ComName || d.comName || 'N/A');
+
+                let row = `
+                    <tr id="row-${deptId}" data-comid="${comIdData}">
+                        <td>${deptName}</td>
+                        <td>${comName}</td>
+                        <td>
+                            <button class="btn btn-warning btn-sm" onclick="editDepartment('${deptId}')">Edit</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteDepartment('${deptId}')">Delete</button>
+                        </td>
+                    </tr>`;
+                $("#departmentTable").append(row);
+            });
+        }).fail(function(xhr, status, error){
+            console.error("Filter error:", {
+                status: xhr.status,
+                statusText: xhr.statusText,
+                responseText: xhr.responseText,
+                error: error,
+                url: url
+            });
+            $("#departmentTable").html('<tr><td colspan="3">Error loading departments. Check server status.</td></tr>');
+            alert("Failed to filter departments: " + (xhr.responseJSON?.message || "Network error or server unavailable. Please ensure the server is running."));
         });
-    }).fail(function(xhr, status, error){
-        console.error("Filter error:", {
-            status: xhr.status,
-            statusText: xhr.statusText,
-            responseText: xhr.responseText,
-            error: error,
-            url: url // Add the requested URL for context
-        });
-        $("#departmentTable").html('<tr><td colspan="3">Error loading departments. Check server status.</td></tr>');
-        alert("Failed to filter departments: " + (xhr.responseJSON?.message || "Network error or server unavailable. Please ensure the server is running at https://localhost:7281."));
     });
-});
+
     // --- Delete Department ---
     window.deleteDepartment = function(id){
         if(confirm("Delete this department?")){
@@ -193,12 +196,7 @@ $(document).ready(function(){
                     }
                 },
                 error: function(xhr, status, error){
-                    console.error("Delete error:", {
-                        status: xhr.status,
-                        statusText: xhr.statusText,
-                        responseText: xhr.responseText,
-                        error: error
-                    });
+                    console.error("Delete error:", xhr.responseText, status, error);
                     alert("Failed to delete department: " + (xhr.responseJSON?.message || "Unknown error"));
                 }
             });
@@ -213,17 +211,17 @@ $(document).ready(function(){
         let newName = prompt("Edit Department Name:", name);
         if (newName === null || newName.trim() === "") return;
 
-        let companyOptions = $("#createForm select[name='ComId'] option").map(function(){
-            return { value: $(this).val(), text: $(this).text() };
-        }).get().filter(opt => opt.value !== "");
-
-        let companyPrompt = "Select Company:\n" + companyOptions.map((opt, i) => `${i + 1}. ${opt.text} (${opt.value})`).join("\n");
-        let comIndex = prompt(companyPrompt, companyOptions.findIndex(opt => opt.text === companyName) + 1 || "1");
-        let comId = companyOptions[parseInt(comIndex) - 1]?.value || "";
-        
+        // Get comId from data attribute
+        let comId = row.data("comid");
         if (!comId) {
-            alert("Invalid company selection.");
-            return;
+            let companyOptions = $("#createForm select[name='ComId'] option").map(function(){
+                return { value: $(this).val(), text: $(this).text() };
+            }).get().filter(opt => opt.value !== "");
+            comId = companyOptions[0]?.value; // Fallback to first company if not found
+            if (!comId) {
+                alert("No valid company found.");
+                return;
+            }
         }
 
         $.ajax({
@@ -235,17 +233,42 @@ $(document).ready(function(){
                 console.log("Edit response:", res);
                 alert(res.message || "No message returned from server");
                 if (res.success && res.department){
-                    row.find("td:eq(0)").text(escapeHtml(res.department.DeptName || res.department.deptName));
-                    row.find("td:eq(1)").text(escapeHtml(res.department.ComName || res.department.comName));
+                    row.find("td:eq(0)").text(escapeHtml(res.department.DeptName));
+                    row.find("td:eq(1)").text(escapeHtml(res.department.ComName));
+                    row.attr("data-comid", res.department.ComId);
+
+                    // Refresh table based on current filter
+                    let currentComId = $("#companyDropdown").val() || "";
+                    let url = currentComId ? '/Departments/GetDepartmentsByCompany?comId=' + currentComId : '/Departments/GetAllDepartments';
+                    $.getJSON(url, function(data) {
+                        $("#departmentTable").empty();
+                        if (data.length === 0 || (data.success === false)) {
+                            $("#departmentTable").html('<tr><td colspan="3">No departments found.</td></tr>');
+                            return;
+                        }
+                        $.each(data, function(i, d){
+                            let deptIdData = d.DeptId || d.deptId || 'Unknown';
+                            let deptNameData = escapeHtml(d.DeptName || d.deptName || 'Unknown');
+                            let comIdData = d.ComId || d.comId || '';
+                            let comNameData = escapeHtml(d.ComName || d.comName || 'N/A');
+                            let rowHtml = `
+                                <tr id="row-${deptIdData}" data-comid="${comIdData}">
+                                    <td>${deptNameData}</td>
+                                    <td>${comNameData}</td>
+                                    <td>
+                                        <button class="btn btn-warning btn-sm" onclick="editDepartment('${deptIdData}')">Edit</button>
+                                        <button class="btn btn-danger btn-sm" onclick="deleteDepartment('${deptIdData}')">Delete</button>
+                                    </td>
+                                </tr>`;
+                            $("#departmentTable").append(rowHtml);
+                        });
+                    }).fail(function(xhr, status, error){
+                        console.error("Refresh error after edit:", error);
+                    });
                 }
             },
             error: function(xhr, status, error){
-                console.error("Edit error:", {
-                    status: xhr.status,
-                    statusText: xhr.statusText,
-                    responseText: xhr.responseText,
-                    error: error
-                });
+                console.error("Edit error:", xhr.responseText, status, error);
                 alert("Failed to edit department: " + (xhr.responseJSON?.message || "Unknown error"));
             }
         });

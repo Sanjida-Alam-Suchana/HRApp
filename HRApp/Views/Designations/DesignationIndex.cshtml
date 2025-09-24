@@ -54,7 +54,7 @@
             @foreach(var d in Model)
             {
                 var companyName = companies.FirstOrDefault(c => c.ComId == d.ComId)?.ComName ?? "N/A";
-                <tr id="row-@d.DesigId">
+                <tr id="row-@d.DesigId" data-comid="@d.ComId">
                     <td>@d.DesigName</td>
                     <td>@companyName</td>
                     <td>
@@ -155,17 +155,17 @@ $(document).ready(function(){
             $.each(data, function(i, d){
                 let desigId = d.DesigId || d.desigId || 'Unknown';
                 let desigName = escapeHtml(d.DesigName || d.desigName || 'Unknown');
-                let comId = d.ComId || d.comId || '';
+                let comIdData = d.ComId || d.comId || '';
                 let comName = escapeHtml(d.ComName || d.comName || 'N/A');
 
                 let row = `
-                    <tr id="row-${desigId}" data-comid="${comId}">
+                    <tr id="row-${desigId}" data-comid="${comIdData}">
                         <td>${desigName}</td>
                         <td>${comName}</td>
                         <td>
                             <button class="btn btn-warning btn-sm" onclick="editDesignation('${desigId}')">Edit</button>
                             <button class="btn btn-danger btn-sm" onclick="deleteDesignation('${desigId}')">Delete</button>
-                            </td>
+                        </td>
                     </tr>`;
                 $("#designationTable").append(row);
             });
@@ -211,16 +211,10 @@ $(document).ready(function(){
         let newName = prompt("Edit Designation Name:", name);
         if (newName === null || newName.trim() === "") return;
 
-        let companyOptions = $("#createForm select[name='ComId'] option").map(function(){
-            return { value: $(this).val(), text: $(this).text() };
-        }).get().filter(opt => opt.value !== "");
-
-        let companyPrompt = "Select Company:\n" + companyOptions.map((opt, i) => `${i + 1}. ${opt.text} (${opt.value})`).join("\n");
-        let comIndex = prompt(companyPrompt, companyOptions.findIndex(opt => opt.text === companyName) + 1 || "1");
-        let comId = companyOptions[parseInt(comIndex) - 1]?.value || "";
-        
+        // Get comId from data attribute
+        let comId = row.data("comid");
         if (!comId) {
-            alert("Invalid company selection.");
+            alert("Company ID not found.");
             return;
         }
 
@@ -233,8 +227,40 @@ $(document).ready(function(){
                 console.log("Edit response:", res);
                 alert(res.message || "No message returned from server");
                 if (res.success && res.designation){
+                    // Update the specific row immediately
                     row.find("td:eq(0)").text(escapeHtml(res.designation.DesigName));
                     row.find("td:eq(1)").text(escapeHtml(res.designation.ComName));
+                    row.attr("data-comid", res.designation.ComId);
+
+                    // Refresh the entire table based on current filter
+                    let currentComId = $("#companyDropdown").val() || "";
+                    let refreshUrl = currentComId ? '/Designations/GetDesignationsByCompany?comId=' + currentComId : '/Designations/GetAllDesignations';
+                    $.getJSON(refreshUrl, function(data) {
+                        $("#designationTable").empty();
+                        if (data.length === 0 || (data.success === false)) {
+                            $("#designationTable").html('<tr><td colspan="3">No designations found.</td></tr>');
+                            return;
+                        }
+                        $.each(data, function(i, d){
+                            let desigIdData = d.DesigId || d.desigId || 'Unknown';
+                            let desigNameData = escapeHtml(d.DesigName || d.desigName || 'Unknown');
+                            let comIdData = d.ComId || d.comId || '';
+                            let comNameData = escapeHtml(d.ComName || d.comName || 'N/A');
+
+                            let newRow = `
+                                <tr id="row-${desigIdData}" data-comid="${comIdData}">
+                                    <td>${desigNameData}</td>
+                                    <td>${comNameData}</td>
+                                    <td>
+                                        <button class="btn btn-warning btn-sm" onclick="editDesignation('${desigIdData}')">Edit</button>
+                                        <button class="btn btn-danger btn-sm" onclick="deleteDesignation('${desigIdData}')">Delete</button>
+                                    </td>
+                                </tr>`;
+                            $("#designationTable").append(newRow);
+                        });
+                    }).fail(function(xhr, status, error){
+                        console.error("Refresh error after edit:", error);
+                    });
                 }
             },
             error: function(xhr, status, error){

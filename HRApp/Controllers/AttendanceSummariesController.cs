@@ -18,23 +18,6 @@ namespace HRApp.Controllers
             _unitOfWork = unitOfWork;
         }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CalculateAttendanceSummary(Guid comId, int dtYear, int dtMonth)
-        {
-            try
-            {
-                await _unitOfWork.ExecRawAsync("CALL \"CalculateAttendanceSummary\"({0}, {1}, {2})", comId, dtYear, dtMonth);
-                return Json(new { success = true, message = "Attendance summary generated!" });
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error in CalculateAttendanceSummary: {ex}");
-                return Json(new { success = false, message = ex.Message });
-            }
-        }
-
-        // GET: AttendanceSummaries/AttendanceSummaryIndex
         public async Task<IActionResult> AttendanceSummaryIndex()
         {
             var companies = await _unitOfWork.Companies.GetAllAsync();
@@ -53,10 +36,14 @@ namespace HRApp.Controllers
                     .ToList();
             }
 
+            // Debug: Log loaded summaries
+            foreach (var summary in summaries)
+            {
+                Console.WriteLine($"SummaryId: {summary.SummaryId}, SummaryMonth: {summary.SummaryMonth:yyyy-MM}, Year: {summary.SummaryMonth.Year}, Month: {summary.SummaryMonth.Month}");
+            }
+
             return View(summaries);
         }
-
-        // POST: AttendanceSummaries/AttendanceSummaryGenerate (Consolidated method, handles string inputs, checks duplicates)
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AttendanceSummaryGenerate(string ComId, string SummaryMonth)
@@ -65,12 +52,14 @@ namespace HRApp.Controllers
             {
                 return Json(new { success = false, message = "Please select a company." });
             }
-            if (!DateTime.TryParseExact(SummaryMonth, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var summaryDate))
+            if (!DateTime.TryParseExact(SummaryMonth, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var tempDate))
             {
                 return Json(new { success = false, message = "Invalid month format." });
             }
+            var summaryDate = DateOnly.FromDateTime(tempDate); // Convert to DateOnly for clarity
+            Console.WriteLine($"Received SummaryMonth: {SummaryMonth}, Parsed Year: {summaryDate.Year}, Month: {summaryDate.Month}"); // Debug
 
-            // Check duplicate
+            // Check for duplicates
             var existingSummaries = await _unitOfWork.AttendanceSummaries.GetQueryable()
                 .Where(s => s.ComId == comId
                          && s.SummaryMonth.Year == summaryDate.Year
@@ -84,8 +73,10 @@ namespace HRApp.Controllers
 
             try
             {
+                Console.WriteLine($"Calling CalculateAttendanceSummary with ComId: {comId}, Year: {summaryDate.Year}, Month: {summaryDate.Month}");
                 await _unitOfWork.ExecRawAsync("CALL \"CalculateAttendanceSummary\"({0}, {1}, {2})", comId, summaryDate.Year, summaryDate.Month);
-                return Json(new { success = true, message = $"Attendance summaries generated successfully!" });
+                Console.WriteLine("Procedure call completed");
+                return Json(new { success = true, message = "Attendance summaries generated successfully!" });
             }
             catch (Exception ex)
             {
@@ -93,8 +84,6 @@ namespace HRApp.Controllers
                 return Json(new { success = false, message = ex.Message });
             }
         }
-
-        // GET: GetEmployeesByCompany for AJAX
         [HttpGet]
         public async Task<IActionResult> GetEmployeesByCompany(Guid comId)
         {
@@ -106,7 +95,7 @@ namespace HRApp.Controllers
             return Json(employees);
         }
 
-        // GET: AttendanceSummaries/AttendanceSummaryEdit/{id}
+        [HttpGet]
         public async Task<IActionResult> AttendanceSummaryEdit(Guid id)
         {
             var summary = await _unitOfWork.AttendanceSummaries.GetAsync(id);
@@ -117,7 +106,6 @@ namespace HRApp.Controllers
             return View(summary);
         }
 
-        // POST: AttendanceSummaries/AttendanceSummaryEdit/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AttendanceSummaryEdit(Guid id, AttendanceSummary summary)
@@ -142,7 +130,6 @@ namespace HRApp.Controllers
             return Json(new { success = true, message = "Attendance summary updated successfully!" });
         }
 
-        // POST: AttendanceSummaries/Delete
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(Guid id)
