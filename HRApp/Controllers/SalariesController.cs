@@ -203,77 +203,21 @@ namespace HRApp.Controllers
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
-        // GET: GetEmployeesByCompany for AJAX (if needed for edits)
-        [HttpGet]
-        public async Task<IActionResult> GetEmployeesByCompany(Guid comId)
-        {
-            var employees = await _unitOfWork.Employees.GetQueryable()
-                .Where(e => e.ComId == comId)
-                .Select(e => new { EmpId = e.EmpId.ToString(), EmpName = e.EmpName })
-                .ToListAsync();
 
-            return Json(employees);
-        }
-
-        // GET: Salaries/Edit/{id}
-        public async Task<IActionResult> Edit(Guid id)
-        {
-            var salary = await _unitOfWork.Salaries.GetAsync(id);
-            if (salary == null) return NotFound();
-
-            ViewBag.Companies = await _unitOfWork.Companies.GetAllAsync();
-            ViewBag.Employees = await _unitOfWork.Employees.GetAllAsync();
-            return View(salary);
-        }
-
-        // POST: Salaries/Edit/{id}
+        // POST: Salaries/TogglePayment/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(Guid id, Salary salary)
-        {
-            if (id != salary.SalaryId)
-                return Json(new { success = false, message = "Invalid salary ID." });
-
-            var existingSalary = await _unitOfWork.Salaries.GetAsync(id);
-            if (existingSalary == null)
-                return Json(new { success = false, message = "Salary not found." });
-
-            // Update fields (avoid updating calculated fields if not needed)
-            existingSalary.EmpId = salary.EmpId;
-            existingSalary.ComId = salary.ComId;
-            existingSalary.dtYear = salary.dtYear;
-            existingSalary.dtMonth = salary.dtMonth;
-            existingSalary.Gross = salary.Gross;
-            existingSalary.Basic = salary.Basic;
-            existingSalary.HRent = salary.HRent;
-            existingSalary.Medical = salary.Medical;
-            existingSalary.AbsentDays = salary.AbsentDays;
-            existingSalary.AbsentAmount = salary.AbsentAmount;
-            existingSalary.PayableAmount = salary.PayableAmount;
-            existingSalary.IsPaid = salary.IsPaid;
-            existingSalary.PaidAmount = salary.PaidAmount;
-
-            await _unitOfWork.SaveAsync();
-            return Json(new { success = true, message = "Salary updated successfully!" });
-        }
-
-        // POST: Salaries/MarkAsPaid/{id} (New: For clicking button in list to pay)
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> MarkAsPaid(Guid id)
+        public async Task<IActionResult> TogglePayment(Guid id)
         {
             var salary = await _unitOfWork.Salaries.GetAsync(id);
             if (salary == null)
                 return Json(new { success = false, message = "Salary not found." });
 
-            if (salary.IsPaid)
-                return Json(new { success = false, message = "Salary already paid." });
-
-            salary.IsPaid = true;
-            salary.PaidAmount = salary.PayableAmount;  // Assume full payment
+            salary.IsPaid = !salary.IsPaid;
+            salary.PaidAmount = salary.IsPaid ? salary.PayableAmount : 0;  // Toggle payment amount
 
             await _unitOfWork.SaveAsync();
-            return Json(new { success = true, message = "Salary marked as paid!" });
+            return Json(new { success = true, message = salary.IsPaid ? "Salary marked as paid!" : "Salary marked as unpaid!" });
         }
 
         // POST: Salaries/Delete/{id}

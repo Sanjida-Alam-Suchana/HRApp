@@ -43,7 +43,7 @@
         </div>
         <div class="form-group col-md-2">
             <br />
-            <button type="button" id="filterBtn" class="btn btn-primary btn-block">Filter</button>
+            <!-- Filter button removed -->
         </div>
     </div>
     <div class="form-row">
@@ -101,8 +101,7 @@
                         <td>@item.PaidAmount</td>
                         <td>@(item.IsPaid ? "Paid" : "Unpaid")</td>
                         <td>
-                            <a asp-action="Edit" asp-route-id="@item.SalaryId">Edit</a> |
-                            <button class="payBtn" data-id="@item.SalaryId">Pay</button> |
+                            <button class="payBtn" data-id="@item.SalaryId">@(item.IsPaid ? "Unpay" : "Pay")</button> |
                             <button class="deleteBtn" data-id="@item.SalaryId">Delete</button>
                         </td>
                     </tr>
@@ -135,12 +134,11 @@
                     .replace(/'/g, "&#039;");
             }
 
-            // Filter button - AJAX to update table
-            $('#filterBtn').click(function (e) {
-                e.preventDefault();
-                console.log('Filter button clicked');
+            // Company filter on dropdown change - AJAX to update table
+            $('#companyDropdown').change(function () {
+                console.log('Company dropdown changed');
 
-                var comId = $('#companyDropdown').val();
+                var comId = $(this).val();
                 var year = parseInt($('#yearDropdown').val());
                 var month = parseInt($('#monthDropdown').val());
 
@@ -163,7 +161,7 @@
                     $('#salaryTableBody').empty();
 
                     if (!data || data.length === 0 || (data.success === false)) {
-                        console.log('No data or error in response:', data);
+                        console.log('No data or error');
                         $('#salaryTableBody').html('<tr><td colspan="12" class="text-center text-muted py-4">No salaries found. Generate some or adjust filters.</td></tr>');
                         return;
                     }
@@ -184,8 +182,7 @@
                                 <td>${salary.paidAmount.toFixed(2)}</td>
                                 <td>${salary.isPaid ? 'Paid' : 'Unpaid'}</td>
                                 <td>
-                                    <a href="/Salaries/Edit/${salary.salaryId}">Edit</a> |
-                                    <button class="payBtn" data-id="${salary.salaryId}">Pay</button> |
+                                    <button class="payBtn" data-id="${salary.salaryId}">${salary.isPaid ? 'Unpay' : 'Pay'}</button> |
                                     <button class="deleteBtn" data-id="${salary.salaryId}">Delete</button>
                                 </td>
                             </tr>`;
@@ -204,6 +201,11 @@
                     $('#salaryTableBody').html(`<tr><td colspan="12" class="text-center text-muted py-4">Error loading salaries: ${xhr.responseJSON?.message || error}</td></tr>`);
                     alert('Failed to filter salaries: ' + (xhr.responseJSON?.message || 'Network error or server unavailable.'));
                 });
+            });
+
+            // Year and Month filter on change
+            $('#yearDropdown, #monthDropdown').change(function () {
+                $('#companyDropdown').trigger('change'); // Trigger company dropdown change to refresh table
             });
 
             // AJAX for Generate Salary
@@ -240,7 +242,7 @@
                         console.log('Generate response:', response);
                         alert(response.message);
                         if (response.success) {
-                            setTimeout(() => $('#filterBtn').trigger('click'), 500); // Delay to ensure DB commit
+                            setTimeout(() => $('#companyDropdown').trigger('change'), 500); // Delay to ensure DB commit
                         }
                     },
                     error: function (xhr, status, error) {
@@ -253,29 +255,32 @@
                 });
             });
 
-            // AJAX for Pay
+            // AJAX for Toggle Payment
             $(document).on('click', '.payBtn', function () {
                 var id = $(this).data('id');
                 if (!id) return;
 
-                if (!confirm('Mark this salary as paid?')) return;
+                var action = $(this).text() === 'Pay' ? 'pay' : 'unpay';
+                var confirmMsg = action === 'pay' ? 'Mark this salary as paid?' : 'Mark this salary as unpaid?';
+
+                if (!confirm(confirmMsg)) return;
 
                 $.ajax({
-                    url: '/Salaries/MarkAsPaid/' + id,
+                    url: '/Salaries/TogglePayment/' + id,
                     type: 'POST',
                     headers: {
                         'RequestVerificationToken': token
                     },
                     success: function (response) {
-                        console.log('Pay response:', response);
+                        console.log('Toggle payment response:', response);
                         alert(response.message);
                         if (response.success) {
-                            $('#filterBtn').trigger('click'); // Refresh table
+                            $('#companyDropdown').trigger('change'); // Refresh table
                         }
                     },
                     error: function (xhr) {
-                        console.error('Pay AJAX error:', xhr.responseText);
-                        alert('Error: ' + (xhr.responseJSON?.message || 'Failed to mark as paid.'));
+                        console.error('Toggle payment AJAX error:', xhr.responseText);
+                        alert('Error: ' + (xhr.responseJSON?.message || 'Failed to toggle payment.'));
                     }
                 });
             });
@@ -296,7 +301,7 @@
                         console.log('Delete response:', response);
                         alert(response.message);
                         if (response.success) {
-                            $('#filterBtn').trigger('click'); // Refresh table
+                            $('#companyDropdown').trigger('change'); // Refresh table
                         }
                     },
                     error: function (xhr) {
@@ -305,6 +310,9 @@
                     }
                 });
             });
+
+            // Trigger change on page load with current values
+            $('#companyDropdown').trigger('change');
         });
     </script>
-}                                                                                              
+}

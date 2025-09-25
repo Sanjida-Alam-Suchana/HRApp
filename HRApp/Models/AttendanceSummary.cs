@@ -23,7 +23,7 @@ namespace HRApp.Models
         [Required]
         [DataType(DataType.Date)]
         [DisplayFormat(DataFormatString = "{0:yyyy-MM}", ApplyFormatInEditMode = true)]
-        public DateTime SummaryMonth { get; set; } // Summary month with proper formatting (year-month)
+        public DateOnly SummaryMonth { get; set; } // Summary month with proper formatting (year-month)
 
         [Required]
         public int TotalDays { get; set; } // Total working days in the month

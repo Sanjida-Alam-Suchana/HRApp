@@ -22,9 +22,10 @@ namespace HRApp.Controllers
         {
             var companies = await _unitOfWork.Companies.GetAllAsync();
             ViewBag.Companies = companies;
+            ViewBag.SelectedComId = Request.Cookies["SelectedComId"];
 
             var selectedComId = Request.Cookies["SelectedComId"];
-            var allShifts = await _unitOfWork.Shifts.GetAllAsync();
+            var allShifts = await _unitOfWork.Shifts.GetAll().Include(s => s.Company).ToListAsync();
             System.Diagnostics.Debug.WriteLine($"Fetched {allShifts?.Count() ?? 0} shifts from database.");
             var shifts = string.IsNullOrEmpty(selectedComId)
                 ? allShifts
@@ -32,9 +33,9 @@ namespace HRApp.Controllers
 
             foreach (var shift in shifts)
             {
-                if (!companies.Any(c => c.ComId == shift.ComId))
+                if (shift.ComId != Guid.Empty && !companies.Any(c => c.ComId == shift.ComId))
                 {
-                    System.Diagnostics.Debug.WriteLine($"Warning: Shift with ID {shift.ShiftId} has ComId {shift.ComId} not found in companies.");
+                    System.Diagnostics.Debug.WriteLine($"Warning: Shift with ID {shift.ShiftId} has invalid ComId {shift.ComId}.");
                 }
             }
 
@@ -42,48 +43,40 @@ namespace HRApp.Controllers
             return View(shifts);
         }
 
-        // GET: Shifts/ShiftCreate (not needed for modal form, but kept for compatibility)
+        // GET: Shifts/ShiftCreate
         public async Task<IActionResult> ShiftCreate()
         {
             ViewBag.Companies = await _unitOfWork.Companies.GetAllAsync();
             return View();
         }
 
+        // POST: Shifts/ShiftCreate
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ShiftCreate(Shift shift)
+        public async Task<IActionResult> ShiftCreate([FromForm] Shift shift)
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"ShiftCreate called with: shiftName={shift.ShiftName}, startTime={Request.Form["startTime"]}, endTime={Request.Form["endTime"]}, comId={shift.ComId}");
+                System.Diagnostics.Debug.WriteLine($"ShiftCreate called with: ShiftName={shift.ShiftName}, StartTime={shift.StartTime}, EndTime={shift.EndTime}, ComId={shift.ComId}");
 
-                if (string.IsNullOrEmpty(shift.ShiftName))
+                if (string.IsNullOrWhiteSpace(shift.ShiftName))
                     return Json(new { success = false, message = "Shift name is required." });
                 if (shift.ComId == Guid.Empty)
                     return Json(new { success = false, message = "Please select a company." });
-
-                var startTimeStr = Request.Form["startTime"];
-                var endTimeStr = Request.Form["endTime"];
-                if (string.IsNullOrEmpty(startTimeStr) || string.IsNullOrEmpty(endTimeStr))
+                if (shift.StartTime == default || shift.EndTime == default)
                     return Json(new { success = false, message = "Start time and end time are required." });
-
-                if (!TimeOnly.TryParseExact(startTimeStr, "HH:mm", null, System.Globalization.DateTimeStyles.None, out var startTime))
-                    return Json(new { success = false, message = $"Invalid start time format. Use HH:mm (e.g., 09:00). Received: {startTimeStr}" });
-                if (!TimeOnly.TryParseExact(endTimeStr, "HH:mm", null, System.Globalization.DateTimeStyles.None, out var endTime))
-                    return Json(new { success = false, message = $"Invalid end time format. Use HH:mm (e.g., 17:00). Received: {endTimeStr}" });
-
-                if (startTime >= endTime)
+                if (shift.StartTime >= shift.EndTime)
                     return Json(new { success = false, message = "End time must be after start time." });
 
-                shift.ShiftId = Guid.NewGuid();
-                shift.StartTime = startTime;
-                shift.EndTime = endTime;
+                var company = await _unitOfWork.Companies.GetAsync(shift.ComId);
+                if (company == null)
+                    return Json(new { success = false, message = "Selected company does not exist." });
 
+                shift.ShiftId = Guid.NewGuid();
                 await _unitOfWork.Shifts.AddAsync(shift);
                 await _unitOfWork.SaveAsync();
 
-                var company = await _unitOfWork.Companies.GetAsync(shift.ComId);
-                System.Diagnostics.Debug.WriteLine($"Shift created: {shift.ShiftName}, Start: {shift.StartTime}, End: {shift.EndTime}, Company: {company?.ComName}");
+                System.Diagnostics.Debug.WriteLine($"Shift created: {shift.ShiftName}, Start: {shift.StartTime}, End: {shift.EndTime}, Company: {company.ComName}");
 
                 return Json(new
                 {
@@ -96,7 +89,7 @@ namespace HRApp.Controllers
                         startTime = shift.StartTime.ToString("HH:mm"),
                         endTime = shift.EndTime.ToString("HH:mm"),
                         shift.ComId,
-                        comName = company?.ComName ?? "N/A"
+                        comName = company.ComName // Always return valid company name
                     }
                 });
             }
@@ -107,47 +100,23 @@ namespace HRApp.Controllers
             }
         }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ShiftEdit(string shiftId, string shiftName, string startTime, string endTime, string comId)
+        // GET: Shifts/GetShift/{id}
+        [HttpGet]
+        public async Task<IActionResult> GetShift(Guid id)
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"ShiftEdit called with: shiftId={shiftId}, shiftName={shiftName}, startTime={startTime}, endTime={endTime}, comId={comId}");
-
-                if (!Guid.TryParse(shiftId, out var guidShiftId) || string.IsNullOrEmpty(shiftName) || string.IsNullOrEmpty(startTime) || string.IsNullOrEmpty(endTime) || !Guid.TryParse(comId, out var guidComId))
-                    return Json(new { success = false, message = "Invalid input data. Ensure all fields are valid." });
-
-                var shift = await _unitOfWork.Shifts.GetAsync(guidShiftId);
+                System.Diagnostics.Debug.WriteLine($"Fetching shift for id: {id} at {DateTime.Now}");
+                var shift = await _unitOfWork.Shifts.GetAll().Include(s => s.Company).FirstOrDefaultAsync(s => s.ShiftId == id);
                 if (shift == null)
-                    return Json(new { success = false, message = "Shift not found." });
-
-                if (!TimeOnly.TryParseExact(startTime, "HH:mm", null, System.Globalization.DateTimeStyles.None, out var startTimeValue))
-                    return Json(new { success = false, message = $"Invalid start time format. Use HH:mm (e.g., 09:00). Received: {startTime}" });
-                if (!TimeOnly.TryParseExact(endTime, "HH:mm", null, System.Globalization.DateTimeStyles.None, out var endTimeValue))
-                    return Json(new { success = false, message = $"Invalid end time format. Use HH:mm (e.g., 17:00). Received: {endTime}" });
-
-                if (startTimeValue >= endTimeValue)
-                    return Json(new { success = false, message = "End time must be after start time." });
-
-                var company = await _unitOfWork.Companies.GetAsync(guidComId);
-                if (company == null)
-                    return Json(new { success = false, message = "Invalid company ID." });
-
-                shift.ShiftName = shiftName;
-                shift.StartTime = startTimeValue;
-                shift.EndTime = endTimeValue;
-                shift.ComId = guidComId;
-
-                await _unitOfWork.Shifts.UpdateAsync(shift);
-                await _unitOfWork.SaveAsync();
-
-                System.Diagnostics.Debug.WriteLine($"Shift updated: {shift.ShiftName}, Start: {shift.StartTime}, End: {shift.EndTime}, Company: {company?.ComName}");
+                {
+                    System.Diagnostics.Debug.WriteLine($"Shift not found for id: {id}");
+                    return NotFound(new { success = false, message = "Shift not found." });
+                }
 
                 return Json(new
                 {
                     success = true,
-                    message = "Shift updated successfully!",
                     shift = new
                     {
                         shiftId = shift.ShiftId.ToString(),
@@ -155,14 +124,68 @@ namespace HRApp.Controllers
                         startTime = shift.StartTime.ToString("HH:mm"),
                         endTime = shift.EndTime.ToString("HH:mm"),
                         shift.ComId,
-                        comName = company?.ComName ?? "N/A"
+                        comName = shift.Company?.ComName ?? "N/A" // Fallback only if Company is null
                     }
                 });
             }
-            catch (DbUpdateException ex)
+            catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"DbUpdateException in ShiftEdit: {ex.InnerException?.Message ?? ex.Message}");
-                return Json(new { success = false, message = $"Database error: {ex.InnerException?.Message ?? ex.Message}" });
+                System.Diagnostics.Debug.WriteLine($"Error in GetShift at {DateTime.Now}: {ex}");
+                return StatusCode(500, new { success = false, message = "Server error: " + ex.Message });
+            }
+        }
+
+        // POST: Shifts/ShiftEdit/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ShiftEdit(Guid id, [FromForm] Shift shift)
+        {
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"ShiftEdit called with: ShiftId={id}, ShiftName={shift.ShiftName}, StartTime={shift.StartTime}, EndTime={shift.EndTime}, ComId={shift.ComId}");
+
+                if (id != shift.ShiftId)
+                    return Json(new { success = false, message = "Invalid ID." });
+                if (string.IsNullOrWhiteSpace(shift.ShiftName))
+                    return Json(new { success = false, message = "Shift name is required." });
+                if (shift.ComId == Guid.Empty)
+                    return Json(new { success = false, message = "Please select a company." });
+                if (shift.StartTime == default || shift.EndTime == default)
+                    return Json(new { success = false, message = "Start time and end time are required." });
+                if (shift.StartTime >= shift.EndTime)
+                    return Json(new { success = false, message = "End time must be after start time." });
+
+                var existing = await _unitOfWork.Shifts.GetAll().Include(s => s.Company).FirstOrDefaultAsync(s => s.ShiftId == id);
+                if (existing == null)
+                    return Json(new { success = false, message = "Shift not found." });
+
+                var company = await _unitOfWork.Companies.GetAsync(shift.ComId);
+                if (company == null)
+                    return Json(new { success = false, message = "Selected company does not exist." });
+
+                existing.ShiftName = shift.ShiftName;
+                existing.StartTime = shift.StartTime;
+                existing.EndTime = shift.EndTime;
+                existing.ComId = shift.ComId;
+
+                await _unitOfWork.SaveAsync();
+
+                System.Diagnostics.Debug.WriteLine($"Shift updated: {existing.ShiftName}, Start: {existing.StartTime}, End: {existing.EndTime}, Company: {company.ComName}");
+
+                return Json(new
+                {
+                    success = true,
+                    message = "Shift updated successfully!",
+                    shift = new
+                    {
+                        shiftId = existing.ShiftId.ToString(),
+                        existing.ShiftName,
+                        startTime = existing.StartTime.ToString("HH:mm"),
+                        endTime = existing.EndTime.ToString("HH:mm"),
+                        existing.ComId,
+                        comName = company.ComName // Always return valid company name
+                    }
+                });
             }
             catch (Exception ex)
             {
@@ -171,18 +194,16 @@ namespace HRApp.Controllers
             }
         }
 
+        // POST: Shifts/Delete/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Delete(string id)
+        public async Task<IActionResult> Delete(Guid id)
         {
             try
             {
                 System.Diagnostics.Debug.WriteLine($"Delete called with shiftId={id}");
 
-                if (!Guid.TryParse(id, out var guidId))
-                    return Json(new { success = false, message = "Invalid shift ID." });
-
-                var shift = await _unitOfWork.Shifts.GetAsync(guidId);
+                var shift = await _unitOfWork.Shifts.GetAsync(id);
                 if (shift == null)
                     return Json(new { success = false, message = "Shift not found." });
 
@@ -199,13 +220,14 @@ namespace HRApp.Controllers
             }
         }
 
+        // GET: Shifts/GetShiftsByCompany
         [HttpGet]
         public async Task<IActionResult> GetShiftsByCompany(Guid comId)
         {
             try
             {
                 System.Diagnostics.Debug.WriteLine($"Fetching shifts for ComId {comId} at {DateTime.Now}");
-                var shifts = await _unitOfWork.Shifts.GetAllAsync();
+                var shifts = await _unitOfWork.Shifts.GetAll().Include(s => s.Company).ToListAsync();
                 var result = shifts
                     .Where(s => s.ComId == comId)
                     .Select(s => new
@@ -215,7 +237,7 @@ namespace HRApp.Controllers
                         startTime = s.StartTime.ToString("HH:mm"),
                         endTime = s.EndTime.ToString("HH:mm"),
                         s.ComId,
-                        comName = s.Company != null ? s.Company.ComName : "N/A"
+                        comName = s.Company?.ComName ?? "N/A" // Fallback only if Company is null
                     }).ToList();
 
                 System.Diagnostics.Debug.WriteLine($"Found {result.Count} shifts for ComId {comId}");
@@ -228,13 +250,14 @@ namespace HRApp.Controllers
             }
         }
 
+        // GET: Shifts/GetAllShifts
         [HttpGet]
         public async Task<IActionResult> GetAllShifts()
         {
             try
             {
                 System.Diagnostics.Debug.WriteLine($"Fetching all shifts at {DateTime.Now}");
-                var shifts = await _unitOfWork.Shifts.GetAllAsync();
+                var shifts = await _unitOfWork.Shifts.GetAll().Include(s => s.Company).ToListAsync();
                 var result = shifts
                     .Select(s => new
                     {
@@ -243,7 +266,7 @@ namespace HRApp.Controllers
                         startTime = s.StartTime.ToString("HH:mm"),
                         endTime = s.EndTime.ToString("HH:mm"),
                         s.ComId,
-                        comName = s.Company != null ? s.Company.ComName : "N/A"
+                        comName = s.Company?.ComName ?? "N/A" // Fallback only if Company is null
                     }).ToList();
 
                 System.Diagnostics.Debug.WriteLine($"Found {result.Count} shifts");

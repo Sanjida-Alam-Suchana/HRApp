@@ -108,7 +108,7 @@ namespace HRApp.Controllers
 
             existingSummary.EmpId = summary.EmpId;
             existingSummary.ComId = summary.ComId;
-            existingSummary.SummaryMonth = DateTime.SpecifyKind(new DateTime(summary.SummaryMonth.Year, summary.SummaryMonth.Month, 1), DateTimeKind.Utc);
+            existingSummary.SummaryMonth=DateOnly.FromDateTime(new DateTime(summary.SummaryMonth.Year, summary.SummaryMonth.Month, 1));
             existingSummary.TotalDays = summary.TotalDays;
             existingSummary.DaysPresent = summary.DaysPresent;
             existingSummary.DaysAbsent = summary.DaysAbsent;
